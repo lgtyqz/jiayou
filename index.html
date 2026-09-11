@@ -22,7 +22,35 @@
         />
         <h1 class="text-title">JIAYOU!</h1>
         <p id="tagline" class="tagline">all according to plant</p>
-        <button id="save" class="button save">Save to Drive</button>
+        <div class="board-actions">
+          <button
+            id="import-board"
+            class="button board-file-button"
+            type="button"
+            title="Import board"
+            aria-label="Import board"
+          >
+            <img src="./assets/import.svg" alt="" width="16" height="16" />
+          </button>
+          <input
+            id="board-file-input"
+            type="file"
+            accept=".json,application/json"
+            hidden
+          />
+          <button
+            id="download-board"
+            class="button board-file-button"
+            type="button"
+            title="Download board"
+            aria-label="Download board"
+          >
+            <img src="./assets/download.svg" alt="" width="16" height="16" />
+          </button>
+          <button id="save" class="button save" type="button">
+            Save to Drive
+          </button>
+        </div>
       </header>
       <div class="toolbar">
         <div class="search">
@@ -54,7 +82,13 @@
           </button>
         </div>
         <div class="actions">
-          <span class="drag-label">DRAG TO...</span
+          <span
+            id="destroy-status"
+            class="drag-label"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            >DRAG TO...</span
           ><button id="create" class="button">
             <img
               src="./assets/imgEllipse3.svg"
@@ -65,7 +99,7 @@
           ><button
             id="destroy"
             class="button destroy"
-            title="Drag a card here to delete it"
+            title="Drag a card here to delete it, or hold for 3 seconds to clear the board"
           >
             <img
               src="./assets/imgEllipse4.svg"

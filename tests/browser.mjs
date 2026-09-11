@@ -15,23 +15,38 @@ await call('Page.navigate',{url:'http://localhost:8000/'});await sleep(800);
 await evaluate('localStorage.clear(); location.reload()');await sleep(500);
 await evaluate('document.fonts.ready');
 await sleep(200);
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),9);
 assert.deepEqual(
   await evaluate('[...document.querySelectorAll(".text-card-title")].map(card => card.textContent)'),
   [
-    'Move cards',
-    'Set card color',
-    'Expand cards',
+    'Type here to edit!',
+    'Move me around!',
+    'Set my color with the star!',
+    'Expand cards over here ->',
     'Set card category',
-    'Create cards',
-    'Destroy cards',
-    'Search for cards',
+    'Drag from Create to make a card',
+    'Drag to Destroy to destroy me!',
+    'You can also search for cards!',
+    'How to destroy all cards',
   ],
 );
 assert.equal(await evaluate('[...document.images].every(i=>i.complete && i.naturalWidth>0)'),true);
+assert.equal(await evaluate('["#import-board","#download-board"].every(selector=>document.querySelector(selector).textContent.trim()===""&&document.querySelector(selector).querySelector("img"))'),true);
+assert.equal(await evaluate('(()=>{const imported=document.querySelector("#import-board").getBoundingClientRect();const downloaded=document.querySelector("#download-board").getBoundingClientRect();const saved=document.querySelector("#save").getBoundingClientRect();return imported.right<downloaded.left&&downloaded.right<saved.left&&imported.height===saved.height&&downloaded.height===saved.height})()'),true);
 const screenshot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-desktop.png',Buffer.from(screenshot.data,'base64'));
-const click=async selector=>{const p=await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});await sleep(50);};
-await click('#create');assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
+const click=async selector=>{const p=await evaluate(`(async()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el.closest("#color-palette")){el.scrollIntoView({block:'center',inline:'center'});await new Promise(requestAnimationFrame)}const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});await sleep(50);};
+await evaluate(`window.realObjectUrl=URL.createObjectURL;window.realAnchorClick=HTMLAnchorElement.prototype.click;window.downloadProbe={};URL.createObjectURL=blob=>{downloadProbe.blob=blob;return "blob:jiayou-test"};HTMLAnchorElement.prototype.click=function(){downloadProbe.name=this.download}`);
+await click('#download-board');
+const downloadedBoard=JSON.parse(await evaluate('(async()=>JSON.stringify({name:downloadProbe.name,type:downloadProbe.blob.type,board:JSON.parse(await downloadProbe.blob.text())}))()'));
+assert.match(downloadedBoard.name,/^jiayou-board-\d{4}-\d{2}-\d{2}\.json$/);
+assert.equal(downloadedBoard.type,'application/json');
+assert.equal(downloadedBoard.board.columns.reduce((total,column)=>total+column.cards.length,0),9);
+await evaluate('URL.createObjectURL=window.realObjectUrl;HTMLAnchorElement.prototype.click=window.realAnchorClick');
+await evaluate(`window.realConfirm=window.confirm;window.confirm=()=>true;(()=>{const imported=JSON.parse(JSON.stringify(board));imported.columns[0].cards[0].description="Imported marker";const transfer=new DataTransfer();transfer.items.add(new File([JSON.stringify(imported)],"board.json",{type:"application/json"}));Object.defineProperty(document.querySelector("#board-file-input"),"files",{value:transfer.files,configurable:true});document.querySelector("#board-file-input").dispatchEvent(new Event("change"))})()`);await sleep(100);
+assert.equal(await evaluate('board.columns[0].cards[0].description'),'Imported marker');
+assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[0].cards[0].description'),'Imported marker');
+await evaluate('window.confirm=window.realConfirm');
+await click('#create');assert.equal(await evaluate('document.querySelectorAll(".card").length'),10);
 await call('Input.insertText',{text:'Ship a lovely board'});
 assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[0].cards.at(-1).title'),'Ship a lovely board');
 await click('#search');await call('Input.insertText',{text:'shp lvly'});assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
@@ -42,7 +57,7 @@ await click('[data-column="progress"] .column-toggle');await sleep(350);
 assert.equal(await evaluate('Math.round(document.querySelector("[data-column=progress]").getBoundingClientRect().width)'),56);
 const collapsed=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-collapsed.png',Buffer.from(collapsed.data,'base64'));
 await click('[data-column="progress"] .column-toggle');await sleep(350);
-const drag=async(from,to)=>{const a=await evaluate(`(()=>{let r=document.querySelector(${JSON.stringify(from)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+5}})()`);const b=await evaluate(`(()=>{let r=document.querySelector(${JSON.stringify(to)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...a});for(let i=1;i<=12;i++){await call('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:a.x+(b.x-a.x)*i/12,y:a.y+(b.y-a.y)*i/12});}await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...b});await sleep(100);};
+const drag=async(from,to)=>{const a=await evaluate(`(()=>{let r=document.querySelector(${JSON.stringify(from)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+5}})()`);const b=await evaluate(`(()=>{let r=document.querySelector(${JSON.stringify(to)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...a});for(let i=1;i<=12;i++){await call('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:a.x+(b.x-a.x)*i/12,y:a.y+(b.y-a.y)*i/12});}const rotation=await evaluate('parseFloat(document.querySelector(".drag-ghost").style.getPropertyValue("--drag-rotation"))');await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...b});await sleep(100);return rotation;};
 const firstPriority=await evaluate('document.querySelector("[data-column=todo] .priority .card").dataset.card');
 await drag('[data-column="todo"] .priority .card:first-child','[data-column="todo"] .priority .card:last-child');
 assert.equal(await evaluate('document.querySelector("[data-column=todo] .priority .card:last-child").dataset.card'),firstPriority);
@@ -50,15 +65,15 @@ await click('[data-column="todo"] .priority-toggle');await sleep(350);
 assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-column=todo] .priority")).backgroundColor'),'rgb(255, 255, 255)');
 await click('[data-column="todo"] .priority-toggle');await sleep(350);
 assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-column=todo] .priority")).backgroundColor'),'rgb(87, 87, 87)');
-await drag('#create','.masthead');assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
-await drag('#create','[data-column="done"] .regular');assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[2].cards.length'),1);
-await drag('[data-column="done"] .card','[data-column="progress"] .regular');assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[2].cards.length'),0);
-await drag('[data-column="progress"] .regular .card:last-child','#destroy');assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
-await call('Page.reload');await sleep(500);assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
+await drag('#create','.masthead');assert.equal(await evaluate('document.querySelectorAll(".card").length'),10);
+const createRotation=await drag('#create','[data-column="done"] .regular');assert.ok(Math.abs(createRotation)>0.5);assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[2].cards.length'),2);
+await drag('[data-column="done"] .regular .card:last-child','[data-column="progress"] .regular');assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[2].cards.length'),1);
+await drag('[data-column="progress"] .regular .card:last-child','#destroy');assert.equal(await evaluate('document.querySelectorAll(".card").length'),10);
+await call('Page.reload');await sleep(500);assert.equal(await evaluate('document.querySelectorAll(".card").length'),10);
 await click('#search');await call('Input.insertText',{text:'no-such-task'});await click('#create');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),9);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),11);
 assert.equal(await evaluate('document.querySelector("#search").value'),'');
-await click('#save');assert.equal(await evaluate('document.querySelector("#setup").open'),true);await evaluate('document.querySelector("#setup").close()');
+await evaluate('window.testClientId=window.JIAYOU_CONFIG.googleClientId;window.JIAYOU_CONFIG.googleClientId=""');await click('#save');assert.equal(await evaluate('document.querySelector("#setup").open'),true);await evaluate('document.querySelector("#setup").close();window.JIAYOU_CONFIG.googleClientId=window.testClientId');
 // Exercise Drive's native REST integration without a real account or credentials.
 await evaluate(`window.driveCalls=[];window.realFetch=window.fetch;drive.token='test-token';drive.expires=Date.now()+60000;window.fetch=async(url,options={})=>{driveCalls.push({url,options});return new Response(JSON.stringify(url.includes('spaces=')?{files:[]}:url.includes('uploadType=multipart')?{id:'test-file'}:{}),{status:200,headers:{'Content-Type':'application/json'}})};connectDrive()`);
 assert.equal(await evaluate('document.querySelector("#save").textContent'),'Autosaved');
@@ -93,16 +108,16 @@ assert.equal(await evaluate('document.querySelector("#color-palette").hidden'),t
 await call('Page.reload');await sleep(400);
 assert.equal(await evaluate('document.querySelector("[data-column=todo] .regular .star img").getAttribute("src")'),'./assets/component-imgStar4.svg');
 await click('#search-color');await click('.palette-option[data-color="blue"]');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),2);
 await click('#search');await call('Input.insertText',{text:'no match'});
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),0);
-await evaluate('document.querySelector("#search").value="gde";document.querySelector("#search").dispatchEvent(new Event("input"))');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
+await evaluate('document.querySelector("#search").value="step";document.querySelector("#search").dispatchEvent(new Event("input"))');
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),2);
 await click('#search-color');await sleep(150);
 const searchShot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-search-palette.png',Buffer.from(searchShot.data,'base64'));
 await click('.all-colors');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
-assert.equal(await evaluate('document.querySelector("#search").value'),'gde');
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
+assert.equal(await evaluate('document.querySelector("#search").value'),'step');
 await click('#search-color');
 await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
 assert.equal(await evaluate('document.querySelector("#color-palette").hidden'),true);
@@ -114,16 +129,33 @@ await call('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'Arrow
 assert.equal(await evaluate('document.activeElement.dataset.color'),'soul');
 await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
 await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),2);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
 await click('#create');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),10);
 assert.equal(await evaluate('document.querySelector("#search-color").classList.contains("active")'),false);
 await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await sleep(200);
 await click('#search-color');
 assert.equal(await evaluate('(()=>{const r=document.querySelector("#color-palette").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0})()'),true);
 assert.equal(await evaluate('[...document.images].every(i=>i.complete && i.naturalWidth>0)'),true);
+console.log(await evaluate('JSON.stringify({star:getComputedStyle(document.querySelector(".star img")).width,search:getComputedStyle(document.querySelector(".search img")).width,cat:getComputedStyle(document.querySelector(".cat")).width})'));
+await click('.masthead');
+const destroyPoint=await evaluate('(()=>{const r=document.querySelector("#destroy").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()');
+await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...destroyPoint});await sleep(1150);
+assert.equal(await evaluate('document.querySelector("#destroy-status").textContent'),'Destroying board in 2…');
+assert.equal(await evaluate('document.body.classList.contains("is-destroying-board")'),true);
+assert.equal(await evaluate('getComputedStyle(document.querySelector(".card")).animationName'),'card-wiggle');
+await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...destroyPoint});await sleep(100);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),10);
+assert.equal(await evaluate('document.querySelector("#destroy-status").textContent'),'DRAG TO...');
+await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...destroyPoint});await sleep(3100);
+assert.equal(await evaluate('board.columns.reduce((total,column)=>total+column.cards.length,0)'),0);
+assert.equal(await evaluate('document.body.classList.contains("is-clearing-board")'),true);
+assert.equal(await evaluate('Number(getComputedStyle(document.querySelector(".card")).opacity)<1'),true);
+const clearingShot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-board-clearing.png',Buffer.from(clearingShot.data,'base64'));
+await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...destroyPoint});await sleep(400);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),0);
+assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns.every(column=>column.cards.length===0)'),true);
 assert.equal(errors.length,0);
 console.log('PASS: star palette color changes and persistence, no priority side effects, combined text/color filtering, All colors, Escape/outside dismissal, keyboard selection, create reset, mobile positioning.');
-console.log('PASS: assets, creation, inline edit, fuzzy search, priority, collapse, pointer drag create/move/delete, reload persistence, Drive setup, mocked Drive creation/autosave/failure/retry/expiry, mobile overflow, no runtime errors.');
-console.log(await evaluate('JSON.stringify({star:getComputedStyle(document.querySelector(".star img")).width,search:getComputedStyle(document.querySelector(".search img")).width,cat:getComputedStyle(document.querySelector(".cat")).width})'));
+console.log('PASS: assets, creation, inline edit, fuzzy search, priority, collapse, pointer drag physics/create/move/delete, hold-to-clear cancellation/countdown/wiggle/fade/persistence, reload persistence, Drive setup, mocked Drive creation/autosave/failure/retry/expiry, mobile overflow, no runtime errors.');
 ws.close();

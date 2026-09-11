@@ -13,6 +13,14 @@ const ASSET_INDEX = {
 };
 
 const SUBHEADERS = [
+  "a simple kanban board for simple people",
+  "a small kanban board for people of all sizes",
+  "a kanban board!",
+  "an easy kanban board",
+  "it's no JIRA (complimentary)",
+  "surely won't get absorbed by Atlassian",
+  "birthplace of evil schemes",
+  "made to keep track of all your sh*t",
   "all according to plant",
   "who up kanning their ban",
   "right click a card to prioritize!",
@@ -27,11 +35,12 @@ const seedCard = ({
   title,
   description,
   color,
+  category = "GUIDE",
   priority = false,
   expanded = false,
 }) => ({
   id: uid(),
-  category: "GUIDE",
+  category,
   title,
   description,
   color,
@@ -49,24 +58,35 @@ const initialBoard = () => ({
       priorityOpen: true,
       cards: [
         seedCard({
-          title: "Move cards",
+          title: "Type here to edit!",
           description:
-            "Drag a card to reorder it, move it to another column, or drop it into Priority. With a card focused, use Alt + arrow keys for keyboard movement.",
-          color: "soul",
+            "You can edit this too!",
+          color: "seth",
+          category: "Type to edit!",
           priority: true,
         }),
         seedCard({
-          title: "Set card color",
+          title: "Move me around!",
+          description:
+            "Drag a card to reorder it, move it to another column, or drop it into Priority.",
+          color: "seth",
+          category: "Step 1",
+          priority: true,
+        }),
+        seedCard({
+          title: "Set my color with the star!",
           description:
             "Select the star in the upper-left of a card, then choose one of seven colors. Changes save automatically.",
+          category: "Step 2",
           color: "soul",
           priority: true,
         }),
         seedCard({
-          title: "Expand cards",
+          title: "Expand cards over here ->",
           description:
             "Select the circle beside a card title to reveal its description. Select it again to collapse the card.",
-          color: "soul",
+          color: "orange",
+          category: "Step 3",
           expanded: true,
         }),
       ],
@@ -82,24 +102,28 @@ const initialBoard = () => ({
           description:
             "Select the category at the top of a card and type a label. Press Enter or click elsewhere when finished.",
           color: "yellow",
+          category: "Step 4"
         }),
         seedCard({
-          title: "Create cards",
+          title: "Drag from Create to make a card",
           description:
             "Select Create to add a card to the first open column, or drag Create to place a new card exactly where you want it.",
+          category: "Step 5",
           color: "green",
         }),
         seedCard({
-          title: "Destroy cards",
+          title: "Drag to Destroy to destroy me!",
           description:
             "Drag a card onto Destroy and release it when the drop target is highlighted.",
-          color: "seth",
+          color: "aqua",
+          category: "Step 6"
         }),
         seedCard({
-          title: "Search for cards",
+          title: "You can also search for cards!",
           description:
             "Search by card title or category. Select the star beside Search to filter the results by color.",
-          color: "orange",
+          category: "Step 7",
+          color: "blue",
         }),
       ],
     },
@@ -108,7 +132,15 @@ const initialBoard = () => ({
       title: "Done",
       collapsed: false,
       priorityOpen: false,
-      cards: [],
+      cards: [
+        seedCard({
+          title: "How to destroy all cards",
+          description:
+            "Press Destroy for 3 seconds to clear the board!",
+          category: "Step 8",
+          color: "seth",
+        }),
+      ],
     },
   ],
 });
@@ -187,6 +219,11 @@ function persist(changed = true) {
     clearTimeout(drive.timer);
     drive.timer = setTimeout(flushDrive, 650);
   }
+}
+function resetFilters() {
+  query = "";
+  colorFilter = "";
+  $("#search").value = "";
 }
 function node(tag, className, text) {
   const el = document.createElement(tag);
@@ -662,6 +699,9 @@ document.addEventListener("pointerdown", (event) => {
     source: cardEl,
     startX: event.clientX,
     startY: event.clientY,
+    lastX: event.clientX,
+    lastTime: event.timeStamp,
+    rotation: 0,
     active: false,
   };
 });
@@ -686,14 +726,21 @@ document.addEventListener(
       document.body.append(drag.ghost);
       drag.ghost.animate(
         [
-          { transform: "scale(1)", boxShadow: "0 0 0 #0000" },
-          { transform: "scale(1.1)", boxShadow: "0 12px 25px #0003" },
+          { opacity: 0.8, boxShadow: "0 0 0 #0000" },
+          { opacity: 1, boxShadow: "0 12px 25px #0003" },
         ],
         { duration: 180, fill: "forwards" },
       );
       drag.source?.classList.add("dragging-source");
       document.body.classList.add("is-dragging");
     }
+    const elapsed = Math.max(8, event.timeStamp - drag.lastTime);
+    const horizontalSpeed = (event.clientX - drag.lastX) / elapsed;
+    const targetRotation = Math.max(-14, Math.min(14, horizontalSpeed * 12));
+    drag.rotation += (targetRotation - drag.rotation) * 0.45;
+    drag.ghost.style.setProperty("--drag-rotation", `${drag.rotation}deg`);
+    drag.lastX = event.clientX;
+    drag.lastTime = event.timeStamp;
     drag.ghost.style.left = event.clientX - 90 + "px";
     drag.ghost.style.top = event.clientY - 20 + "px";
     marker.remove();
@@ -755,11 +802,7 @@ function finishDrag(cancel = false) {
     const old = findCard(current.card.id);
     if (old) old.column.cards.splice(old.column.cards.indexOf(old.card), 1);
     if (!current.target.destroy) {
-      if (current.create) {
-        query = "";
-        colorFilter = "";
-        $("#search").value = "";
-      }
+      if (current.create) resetFilters();
       const column = board.columns.find(
         (item) => item.id === current.target.column,
       );
@@ -788,7 +831,10 @@ function finishDrag(cancel = false) {
 }
 document.addEventListener("pointerup", () => finishDrag());
 document.addEventListener("pointercancel", () => finishDrag(true));
-window.addEventListener("blur", () => finishDrag(true));
+window.addEventListener("blur", () => {
+  finishDrag(true);
+  cancelBoardDestruction();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") finishDrag(true);
 });
@@ -803,9 +849,7 @@ document.addEventListener(
   true,
 );
 $("#create").addEventListener("click", () => {
-  query = "";
-  colorFilter = "";
-  $("#search").value = "";
+  resetFilters();
   const column =
     board.columns.find((item) => !item.collapsed) || board.columns[0];
   const card = {
@@ -823,9 +867,172 @@ $("#create").addEventListener("click", () => {
   render();
   document.querySelector(`[data-card="${card.id}"] .text-card-title`).focus();
 });
-$("#destroy").addEventListener("click", () =>
-  announce("Drag a card onto Destroy to delete it."),
-);
+
+const boardFileInput = $("#board-file-input");
+$("#import-board").addEventListener("click", () => {
+  boardFileInput.value = "";
+  boardFileInput.click();
+});
+boardFileInput.addEventListener("change", async () => {
+  const file = boardFileInput.files[0];
+  if (!file) return;
+  try {
+    if (file.size > 5 * 1024 * 1024)
+      throw new Error("That board file is too large.");
+    const imported = JSON.parse((await file.text()).replace(/^\uFEFF/, ""));
+    if (!validBoard(imported))
+      throw new Error("That file is not a valid JIAYOU board.");
+    if (!confirm("Import this board and replace the current board?")) return;
+    board = imported;
+    resetFilters();
+    persist();
+    render();
+    announce("Board imported.");
+  } catch (error) {
+    announce(error.message || "The board could not be imported.");
+  } finally {
+    boardFileInput.value = "";
+  }
+});
+$("#download-board").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(board, null, 2) + "\n"], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = node("a");
+  link.href = url;
+  link.download = `jiayou-board-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  announce("Board downloaded.");
+});
+
+const DESTROY_HOLD_MS = 3000;
+const BOARD_CLEAR_FADE_MS = 360;
+const destroyButton = $("#destroy");
+const destroyStatus = $("#destroy-status");
+let destroyHold = null;
+let boardClearTimer = null;
+let suppressDestroyClick = false;
+
+function boardHasCards() {
+  return board.columns.some((column) => column.cards.length);
+}
+function resetDestroyInterface() {
+  document.body.classList.remove("is-destroying-board");
+  destroyButton.classList.remove("is-holding");
+  destroyStatus.textContent = "DRAG TO...";
+  $("#board").inert = false;
+  $("#board").removeAttribute("aria-busy");
+}
+function updateDestroyCountdown() {
+  if (!destroyHold || destroyHold.completed) return;
+  const remaining = Math.max(
+    1,
+    Math.ceil(
+      (DESTROY_HOLD_MS - (performance.now() - destroyHold.startedAt)) / 1000,
+    ),
+  );
+  if (remaining === destroyHold.remaining) return;
+  destroyHold.remaining = remaining;
+  destroyStatus.textContent = `Destroying board in ${remaining}…`;
+}
+function completeBoardDestruction() {
+  if (!destroyHold || destroyHold.completed) return;
+  destroyHold.completed = true;
+  clearInterval(destroyHold.countdownTimer);
+  clearTimeout(destroyHold.completionTimer);
+  document.body.classList.remove("is-destroying-board");
+  document.body.classList.add("is-clearing-board");
+  destroyButton.classList.remove("is-holding");
+  destroyStatus.textContent = "Board cleared";
+  board.columns.forEach((column) => column.cards.splice(0));
+  persist();
+  const fadeTime = matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? 0
+    : BOARD_CLEAR_FADE_MS;
+  boardClearTimer = setTimeout(() => {
+    boardClearTimer = null;
+    document.body.classList.remove("is-clearing-board");
+    render();
+    resetDestroyInterface();
+    announce("Board cleared.");
+  }, fadeTime);
+}
+function startBoardDestruction(input) {
+  if (destroyHold || boardClearTimer || drag || !boardHasCards()) return false;
+  closeColorPalette();
+  destroyHold = {
+    ...input,
+    startedAt: performance.now(),
+    remaining: 0,
+    completed: false,
+    countdownTimer: null,
+    completionTimer: null,
+  };
+  const boardElement = $("#board");
+  boardElement.inert = true;
+  boardElement.setAttribute("aria-busy", "true");
+  document.body.classList.add("is-destroying-board");
+  destroyButton.classList.add("is-holding");
+  updateDestroyCountdown();
+  destroyHold.countdownTimer = setInterval(updateDestroyCountdown, 100);
+  destroyHold.completionTimer = setTimeout(
+    completeBoardDestruction,
+    DESTROY_HOLD_MS,
+  );
+  return true;
+}
+function cancelBoardDestruction() {
+  if (!destroyHold) return false;
+  const completed = destroyHold.completed;
+  clearInterval(destroyHold.countdownTimer);
+  clearTimeout(destroyHold.completionTimer);
+  destroyHold = null;
+  if (!completed) resetDestroyInterface();
+  return completed;
+}
+
+destroyButton.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  if (!startBoardDestruction({ pointerId: event.pointerId })) return;
+  destroyButton.setPointerCapture(event.pointerId);
+});
+destroyButton.addEventListener("pointerup", (event) => {
+  if (destroyHold?.pointerId !== event.pointerId) return;
+  suppressDestroyClick = cancelBoardDestruction();
+});
+destroyButton.addEventListener("pointercancel", (event) => {
+  if (destroyHold?.pointerId === event.pointerId) cancelBoardDestruction();
+});
+destroyButton.addEventListener("lostpointercapture", (event) => {
+  if (destroyHold?.pointerId === event.pointerId) cancelBoardDestruction();
+});
+destroyButton.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key) || event.repeat) return;
+  if (startBoardDestruction({ key: event.key })) event.preventDefault();
+});
+destroyButton.addEventListener("keyup", (event) => {
+  if (!destroyHold?.key || !["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
+  const completed = cancelBoardDestruction();
+  if (!completed)
+    announce("Keep holding Destroy for 3 seconds to clear the board.");
+});
+destroyButton.addEventListener("click", (event) => {
+  if (suppressDestroyClick) {
+    suppressDestroyClick = false;
+    event.preventDefault();
+    return;
+  }
+  announce(
+    boardHasCards()
+      ? "Drag a card here to delete it, or hold for 3 seconds to clear the board."
+      : "The board is already empty.",
+  );
+});
 
 function saveLabel(text, disabled) {
   $("#save").textContent = text;
