@@ -15,11 +15,23 @@ await call('Page.navigate',{url:'http://localhost:8000/'});await sleep(800);
 await evaluate('localStorage.clear(); location.reload()');await sleep(500);
 await evaluate('document.fonts.ready');
 await sleep(200);
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),6);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+assert.deepEqual(
+  await evaluate('[...document.querySelectorAll(".text-card-title")].map(card => card.textContent)'),
+  [
+    'Move cards',
+    'Set card color',
+    'Expand cards',
+    'Set card category',
+    'Create cards',
+    'Destroy cards',
+    'Search for cards',
+  ],
+);
 assert.equal(await evaluate('[...document.images].every(i=>i.complete && i.naturalWidth>0)'),true);
 const screenshot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-desktop.png',Buffer.from(screenshot.data,'base64'));
 const click=async selector=>{const p=await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});await sleep(50);};
-await click('#create');assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+await click('#create');assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
 await call('Input.insertText',{text:'Ship a lovely board'});
 assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[0].cards.at(-1).title'),'Ship a lovely board');
 await click('#search');await call('Input.insertText',{text:'shp lvly'});assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
@@ -38,13 +50,13 @@ await click('[data-column="todo"] .priority-toggle');await sleep(350);
 assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-column=todo] .priority")).backgroundColor'),'rgb(255, 255, 255)');
 await click('[data-column="todo"] .priority-toggle');await sleep(350);
 assert.equal(await evaluate('getComputedStyle(document.querySelector("[data-column=todo] .priority")).backgroundColor'),'rgb(87, 87, 87)');
-await drag('#create','.masthead');assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+await drag('#create','.masthead');assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
 await drag('#create','[data-column="done"] .regular');assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[2].cards.length'),1);
 await drag('[data-column="done"] .card','[data-column="progress"] .regular');assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns[2].cards.length'),0);
-await drag('[data-column="progress"] .regular .card:last-child','#destroy');assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
-await call('Page.reload');await sleep(500);assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+await drag('[data-column="progress"] .regular .card:last-child','#destroy');assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
+await call('Page.reload');await sleep(500);assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
 await click('#search');await call('Input.insertText',{text:'no-such-task'});await click('#create');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),9);
 assert.equal(await evaluate('document.querySelector("#search").value'),'');
 await click('#save');assert.equal(await evaluate('document.querySelector("#setup").open'),true);await evaluate('document.querySelector("#setup").close()');
 // Exercise Drive's native REST integration without a real account or credentials.
@@ -84,13 +96,13 @@ await click('#search-color');await click('.palette-option[data-color="blue"]');
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
 await click('#search');await call('Input.insertText',{text:'no match'});
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),0);
-await evaluate('document.querySelector("#search").value="chrs";document.querySelector("#search").dispatchEvent(new Event("input"))');
+await evaluate('document.querySelector("#search").value="gde";document.querySelector("#search").dispatchEvent(new Event("input"))');
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),1);
 await click('#search-color');await sleep(150);
 const searchShot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-search-palette.png',Buffer.from(searchShot.data,'base64'));
 await click('.all-colors');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),6);
-assert.equal(await evaluate('document.querySelector("#search").value'),'chrs');
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+assert.equal(await evaluate('document.querySelector("#search").value'),'gde');
 await click('#search-color');
 await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
 assert.equal(await evaluate('document.querySelector("#color-palette").hidden'),true);
@@ -104,7 +116,7 @@ await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',win
 await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),2);
 await click('#create');
-assert.equal(await evaluate('document.querySelectorAll(".card").length'),7);
+assert.equal(await evaluate('document.querySelectorAll(".card").length'),8);
 assert.equal(await evaluate('document.querySelector("#search-color").classList.contains("active")'),false);
 await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await sleep(200);
 await click('#search-color');

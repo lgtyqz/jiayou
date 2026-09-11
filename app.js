@@ -23,12 +23,17 @@ const SUBHEADERS = [
 
 const $ = (selector) => document.querySelector(selector);
 const uid = () => crypto.randomUUID();
-const seedCard = (color, priority = false, expanded = false) => ({
+const seedCard = ({
+  title,
+  description,
+  color,
+  priority = false,
+  expanded = false,
+}) => ({
   id: uid(),
-  category: "CHORES",
-  title: "Do the fucking dishes",
-  description:
-    "Filler text is text that shares some characteristics of a real written text, but is random or otherwise generated. It may be used to display a sample of fonts, generate text for testing, or to spoof an e-mail spam filter.",
+  category: "GUIDE",
+  title,
+  description,
   color,
   priority,
   expanded,
@@ -43,9 +48,27 @@ const initialBoard = () => ({
       collapsed: false,
       priorityOpen: true,
       cards: [
-        seedCard("soul", true),
-        seedCard("soul", true),
-        seedCard("soul", false, true),
+        seedCard({
+          title: "Move cards",
+          description:
+            "Drag a card to reorder it, move it to another column, or drop it into Priority. With a card focused, use Alt + arrow keys for keyboard movement.",
+          color: "soul",
+          priority: true,
+        }),
+        seedCard({
+          title: "Set card color",
+          description:
+            "Select the star in the upper-left of a card, then choose one of seven colors. Changes save automatically.",
+          color: "soul",
+          priority: true,
+        }),
+        seedCard({
+          title: "Expand cards",
+          description:
+            "Select the circle beside a card title to reveal its description. Select it again to collapse the card.",
+          color: "soul",
+          expanded: true,
+        }),
       ],
     },
     {
@@ -53,7 +76,32 @@ const initialBoard = () => ({
       title: "In Progress",
       collapsed: false,
       priorityOpen: false,
-      cards: [seedCard("yellow"), seedCard("green"), seedCard("seth")],
+      cards: [
+        seedCard({
+          title: "Set card category",
+          description:
+            "Select the category at the top of a card and type a label. Press Enter or click elsewhere when finished.",
+          color: "yellow",
+        }),
+        seedCard({
+          title: "Create cards",
+          description:
+            "Select Create to add a card to the first open column, or drag Create to place a new card exactly where you want it.",
+          color: "green",
+        }),
+        seedCard({
+          title: "Destroy cards",
+          description:
+            "Drag a card onto Destroy and release it when the drop target is highlighted.",
+          color: "seth",
+        }),
+        seedCard({
+          title: "Search for cards",
+          description:
+            "Search by card title or category. Select the star beside Search to filter the results by color.",
+          color: "orange",
+        }),
+      ],
     },
     {
       id: "done",
