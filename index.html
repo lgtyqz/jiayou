@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="referrer" content="no-referrer" />
+    <title>JIAYOU! — Kanban</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./config.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app">
+      <header class="masthead">
+        <img
+          class="cat"
+          src="./assets/imgCat.svg"
+          alt=""
+          width="170"
+          height="228"
+        />
+        <h1 class="text-title">JIAYOU!</h1>
+        <p id="tagline" class="tagline">all according to plant</p>
+        <button id="save" class="button save">Save to Drive</button>
+      </header>
+      <div class="toolbar">
+        <div class="search">
+          <img
+            src="./assets/imgGroup2.svg"
+            alt=""
+            width="16.354"
+            height="16.853"
+          /><input
+            id="search"
+            type="search"
+            placeholder="Search for tasks..."
+            aria-label="Search tasks by title or category"
+          /><button
+            id="search-color"
+            class="icon-button search-color"
+            type="button"
+            aria-label="Filter by color: all colors"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            title="Filter by color"
+          >
+            <img
+              src="./assets/search-star.svg"
+              alt=""
+              width="17.58"
+              height="16.82"
+            />
+          </button>
+        </div>
+        <div class="actions">
+          <span class="drag-label">DRAG TO...</span
+          ><button id="create" class="button">
+            <img
+              src="./assets/imgEllipse3.svg"
+              alt=""
+              width="12"
+              height="12"
+            />Create</button
+          ><button
+            id="destroy"
+            class="button destroy"
+            title="Drag a card here to delete it"
+          >
+            <img
+              src="./assets/imgEllipse4.svg"
+              alt=""
+              width="12"
+              height="12"
+            />Destroy
+          </button>
+        </div>
+      </div>
+      <div id="board" class="board" aria-label="Kanban board"></div>
+      <footer>
+        <span
+          title="Right-click a card to prioritize it, or drag it into Priority on touch screens. Click its star to change color."
+          >Right-click a card to prioritize</span
+        ><span id="local-status" role="status">Saved on this device</span>
+      </footer>
+      <p id="message" class="message" role="status" aria-live="polite"></p>
+    </main>
+    <dialog id="setup">
+      <form method="dialog">
+        <h2>Connect Google Drive</h2>
+        <p>
+          Google Drive isn't configured for this site yet. Your board is still
+          saved on this device.
+        </p>
+        <p>
+          The site owner needs to add a Google OAuth client ID in config.js. See
+          README.md for setup instructions.
+        </p>
+        <button class="button">Got it</button>
+      </form>
+    </dialog>
+  </body>
+</html>
