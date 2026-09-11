@@ -350,7 +350,7 @@ h2 {
   flex-direction: row;
   position: relative;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 0 10px;
   min-height: 30px;
