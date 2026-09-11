@@ -14,7 +14,7 @@ Visit http://localhost:8000. Use HTTP locally rather than opening the file direc
 
 - Use the icon buttons beside **Save to Drive** to import a JIAYOU board from JSON or download the current board as a portable JSON file. Importing validates the file and asks before replacing the current board.
 - Drag **Create** to a column or Priority bin to create a card. Clicking Create adds a task to the first expanded column.
-- Drag cards to reorder, move between columns, or place in Priority. The drag preview tilts with its movement speed. Drop a card on **Destroy** to delete it, or hold **Destroy** for three seconds to clear the entire board; releasing early cancels. Escape cancels a drag.
+- Drag cards to reorder, move between columns, or place in Priority. In wrapped lists, move across a row to choose the exact insertion slot shown by the vertical marker. The drag preview tilts with its movement speed. Drop a card on **Destroy** to delete it, or hold **Destroy** for three seconds to clear the entire board; releasing early cancels. Escape cancels a drag.
 - Click category, title, description, or column title to edit. Click elsewhere to finish. Expand a card to edit its description. Click its star to open the seven-color star palette; choosing a star changes and autosaves the card's color.
 - Right-click a card to prioritize it, or drag it into Priority on touch screens. Drag it below Priority to remove priority.
 - Use the circle controls to shrink or expand columns, Priority bins, and cards.

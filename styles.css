@@ -348,6 +348,7 @@ h2 {
 .card-list {
   display: flex;
   flex-direction: row;
+  position: relative;
   gap: 10px;
   align-items: center;
   justify-content: center;
@@ -500,12 +501,42 @@ h2 {
   cursor: grabbing;
 }
 .drop-marker {
-  height: 4px;
-  width: 181px;
-  max-width: 100%;
-  background: #a4a4b5;
+  position: absolute;
+  z-index: 1100;
+  width: 4px;
+  min-height: 32px;
+  background: #7d7d91;
   border-radius: 2px;
-  flex-shrink: 0;
+  box-shadow: 0 0 0 2px #fff9;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition:
+    left 70ms linear,
+    top 70ms linear,
+    height 70ms linear;
+}
+.drop-marker:not(.empty-list)::before,
+.drop-marker:not(.empty-list)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7d7d91;
+  transform: translateX(-50%);
+}
+.drop-marker:not(.empty-list)::before {
+  top: -2px;
+}
+.drop-marker:not(.empty-list)::after {
+  bottom: -2px;
+}
+.drop-marker.empty-list {
+  width: 80px;
+  min-height: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
 }
 .drop-target {
   outline: 2px dashed #adadbd;

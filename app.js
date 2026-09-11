@@ -669,6 +669,77 @@ document.addEventListener("scroll", () => closeColorPalette(), true);
 
 // Pointer dragging keeps the live drag preview animated and works with mouse, pen, and touch.
 const marker = node("div", "drop-marker");
+function placeDropMarker(list, clientX, clientY, draggedId) {
+  const listRect = list.getBoundingClientRect();
+  const cards = [...list.querySelectorAll(".card")]
+    .filter((card) => card.dataset.card !== draggedId)
+    .map((card) => {
+      const rect = card.getBoundingClientRect();
+      return {
+        card,
+        rect,
+        centerX: rect.left + rect.width / 2,
+        centerY: rect.top + rect.height / 2,
+      };
+    });
+  marker.remove();
+  marker.classList.toggle("empty-list", !cards.length);
+  list.append(marker);
+  if (!cards.length) {
+    marker.style.left = listRect.width / 2 + "px";
+    marker.style.top = Math.min(20, listRect.height / 2) + "px";
+    marker.style.height = "4px";
+    return;
+  }
+
+  const rows = [];
+  cards.forEach((item) => {
+    let row = rows.find(
+      (candidate) => Math.abs(candidate.centerY - item.centerY) < 8,
+    );
+    if (!row) {
+      row = {
+        centerY: item.centerY,
+        top: item.rect.top,
+        bottom: item.rect.bottom,
+        items: [],
+      };
+      rows.push(row);
+    }
+    row.items.push(item);
+    row.top = Math.min(row.top, item.rect.top);
+    row.bottom = Math.max(row.bottom, item.rect.bottom);
+  });
+  rows.sort((a, b) => a.centerY - b.centerY);
+  rows.forEach((row) => row.items.sort((a, b) => a.centerX - b.centerX));
+  const distanceToRow = (row) =>
+    clientY < row.top
+      ? row.top - clientY
+      : clientY > row.bottom
+        ? clientY - row.bottom
+        : 0;
+  const row = rows.reduce((nearest, candidate) =>
+    distanceToRow(candidate) < distanceToRow(nearest) ? candidate : nearest,
+  );
+  const itemAfterPointer = row.items.find((item) => clientX < item.centerX);
+  const itemIndex = itemAfterPointer
+    ? row.items.indexOf(itemAfterPointer)
+    : row.items.length;
+  const previousItem = row.items[itemIndex - 1];
+  const boundaryX = itemAfterPointer
+    ? previousItem
+      ? (previousItem.rect.right + itemAfterPointer.rect.left) / 2
+      : itemAfterPointer.rect.left - 5
+    : row.items.at(-1).rect.right + 5;
+  const lastRowCard = row.items.at(-1).card;
+  const lastRowCardIndex = cards.findIndex((item) => item.card === lastRowCard);
+  const before = itemAfterPointer?.card || cards[lastRowCardIndex + 1]?.card;
+  marker.style.left =
+    Math.max(2, Math.min(listRect.width - 2, boundaryX - listRect.left)) + "px";
+  marker.style.top = row.top - listRect.top - 2 + "px";
+  marker.style.height = row.bottom - row.top + 4 + "px";
+  return before;
+}
 document.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || drag) return;
   const create = event.target.closest("#create");
@@ -759,14 +830,12 @@ document.addEventListener(
       const list = section.querySelector(
         `[data-list="${priority ? "priority" : "regular"}"]`,
       );
-      const before = [...list.querySelectorAll(".card")].find(
-        (el) =>
-          el.dataset.card !== drag.card.id &&
-          event.clientY <
-            el.getBoundingClientRect().top +
-              el.getBoundingClientRect().height / 2,
+      const before = placeDropMarker(
+        list,
+        event.clientX,
+        event.clientY,
+        drag.card.id,
       );
-      list.insertBefore(marker, before || null);
       section.classList.add("drop-target");
       drag.target = {
         column: section.dataset.column,
