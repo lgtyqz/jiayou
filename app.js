@@ -1,6 +1,14 @@
 "use strict";
 
 const STORAGE_KEY = "jiayou.board.v1";
+const DRIVE_CONTEXT_KEY = "jiayou.drive.active.v1";
+const DRIVE_REMEMBERED_KEY = "jiayou.drive.remembered";
+const OAUTH_TOKEN_KEY = "jiayou.oauth.token";
+const OAUTH_STATE_KEY = "jiayou.oauth.state";
+const OAUTH_MODE_KEY = "jiayou.oauth.mode";
+const OAUTH_SILENT_ATTEMPT_KEY = "jiayou.oauth.silent-attempt";
+const LEGACY_DRIVE_FILE = "jiayou-board.json";
+const DRIVE_FILE_SUFFIX = ".jiayou.json";
 const COLORS = ["soul", "orange", "yellow", "green", "aqua", "blue", "seth"];
 const ASSET_INDEX = {
   soul: 1,
@@ -175,9 +183,13 @@ function validBoard(value) {
 }
 let board = initialBoard();
 let storageAvailable = true;
+let cachedDriveContext = null;
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   if (validBoard(saved)) board = saved;
+  const context = JSON.parse(localStorage.getItem(DRIVE_CONTEXT_KEY));
+  if (typeof context?.fileId === "string" && typeof context?.name === "string")
+    cachedDriveContext = context;
 } catch {
   storageAvailable = false;
 }
@@ -190,10 +202,13 @@ const drive = {
   token: "",
   expires: 0,
   fileId: "",
+  fileName: "",
+  boards: [],
   ready: false,
-  busy: false,
   pending: false,
   timer: null,
+  flushPromise: null,
+  operating: false,
 };
 function announce(text) {
   $("#message").textContent = text;
@@ -206,6 +221,13 @@ function persist(changed = true) {
   if (changed) board.updatedAt = Date.now();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+    if (drive.fileId) {
+      cachedDriveContext = { fileId: drive.fileId, name: drive.fileName };
+      localStorage.setItem(
+        DRIVE_CONTEXT_KEY,
+        JSON.stringify(cachedDriveContext),
+      );
+    }
     storageAvailable = true;
   } catch {
     storageAvailable = false;
@@ -970,7 +992,13 @@ $("#download-board").addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const link = node("a");
   link.href = url;
-  link.download = `jiayou-board-${new Date().toISOString().slice(0, 10)}.json`;
+  const baseName = (drive.fileName || "jiayou-board")
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60)
+    .toLowerCase() || "jiayou-board";
+  link.download = `${baseName}-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.append(link);
   link.click();
   link.remove();
@@ -1107,21 +1135,44 @@ function saveLabel(text, disabled) {
   $("#save").textContent = text;
   $("#save").disabled = disabled;
 }
-function clearAuth() {
+function setDriveLoading(loading) {
+  document.body.classList.toggle("drive-loading", loading);
+  $("#board").inert = loading;
+  $(".toolbar").inert = loading;
+  if (loading) $("#board").setAttribute("aria-busy", "true");
+  else $("#board").removeAttribute("aria-busy");
+}
+function clearAuth(forget = false) {
+  clearTimeout(drive.timer);
   drive.ready = false;
   drive.token = "";
+  drive.expires = 0;
   drive.fileId = "";
+  drive.fileName = "";
+  drive.boards = [];
+  drive.pending = false;
+  drive.operating = false;
   try {
-    sessionStorage.removeItem("jiayou.oauth.token");
+    sessionStorage.removeItem(OAUTH_TOKEN_KEY);
+    sessionStorage.removeItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_MODE_KEY);
+    if (forget) {
+      sessionStorage.removeItem(OAUTH_SILENT_ATTEMPT_KEY);
+      localStorage.removeItem(DRIVE_REMEMBERED_KEY);
+      localStorage.removeItem(DRIVE_CONTEXT_KEY);
+      cachedDriveContext = null;
+    }
   } catch {
     /* Storage may be restricted. */
   }
+  renderDriveBoards();
+  setDriveLoading(false);
 }
-function driveError(error) {
+function driveError(error, action = "save") {
   saveLabel(error.status === 401 ? "Save to Drive" : "Retry Drive save", false);
-  if (error.status === 401) clearAuth();
+  if (error.status === 401) clearAuth(false);
   announce(
-    "Drive could not save. Your board is kept on this device. " + error.message,
+    `Drive could not ${action}. Your board is kept on this device. ${error.message}`,
   );
 }
 async function driveRequest(path, options = {}) {
@@ -1144,81 +1195,543 @@ async function driveRequest(path, options = {}) {
     );
   return response.status === 204 ? null : response.json();
 }
-async function connectDrive() {
-  saveLabel("Saving…", true);
+function boardNameFromFile(file) {
+  if (file.name === LEGACY_DRIVE_FILE) return "My Board";
+  if (file.name?.endsWith(DRIVE_FILE_SUFFIX))
+    return file.name.slice(0, -DRIVE_FILE_SUFFIX.length);
+  return file.name || "Untitled Board";
+}
+function driveFileName(name) {
+  return name + DRIVE_FILE_SUFFIX;
+}
+function sortDriveBoards(items = drive.boards) {
+  return [...items].sort(
+    (a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id),
+  );
+}
+function activeDriveBoard() {
+  return drive.boards.find((item) => item.id === drive.fileId);
+}
+function renderDriveBoards() {
+  const manager = $("#board-manager");
+  manager.hidden = !drive.ready;
+  if (!drive.ready) return;
+  const disabled = drive.operating || !!drive.flushPromise;
+  const select = $("#board-select");
+  select.replaceChildren(
+    ...sortDriveBoards().map((item) => {
+      const option = node("option", "", item.name);
+      option.value = item.id;
+      return option;
+    }),
+  );
+  select.value = drive.fileId;
+  select.disabled = disabled;
+  $("#new-board").disabled = disabled;
+  $("#manage-board").disabled = disabled || !drive.fileId;
+  $("#manage-board-name").textContent = drive.fileName || "Current board";
+  $("#delete-board").disabled = disabled || drive.boards.length <= 1;
+}
+function rememberActiveBoard(item) {
+  drive.fileId = item.id;
+  drive.fileName = item.name;
+  cachedDriveContext = { fileId: item.id, name: item.name };
   try {
+    localStorage.setItem(DRIVE_CONTEXT_KEY, JSON.stringify(cachedDriveContext));
+  } catch {
+    storageAvailable = false;
+  }
+}
+function normalizeDriveFile(file) {
+  return {
+    id: file.id,
+    name: boardNameFromFile(file),
+    modifiedTime: file.modifiedTime || "",
+    legacy: file.name === LEGACY_DRIVE_FILE,
+  };
+}
+async function listDriveBoards() {
+  const files = [];
+  let pageToken = "";
+  do {
     const params = new URLSearchParams({
       spaces: "appDataFolder",
-      q: "name = 'jiayou-board.json' and trashed = false",
-      fields: "files(id)",
-      orderBy: "modifiedTime desc",
-      pageSize: "1",
+      q: "trashed = false",
+      fields: "nextPageToken,files(id,name,modifiedTime,appProperties)",
+      pageSize: "100",
     });
+    if (pageToken) params.set("pageToken", pageToken);
     const result = await driveRequest("drive/v3/files?" + params);
-    drive.fileId = result.files[0]?.id || "";
-    if (drive.fileId) {
-      const remote = await driveRequest(
-        `drive/v3/files/${encodeURIComponent(drive.fileId)}?alt=media`,
-      );
-      if (!validBoard(remote))
-        throw new Error("The Drive board has an unsupported format.");
-      if (remote.updatedAt > board.updatedAt) {
-        board = remote;
-        persist(false);
-        render();
+    files.push(
+      ...(result.files || []).filter(
+        (file) =>
+          file.id &&
+          (file.name === LEGACY_DRIVE_FILE ||
+            file.appProperties?.jiayouType === "board"),
+      ),
+    );
+    pageToken = result.nextPageToken || "";
+  } while (pageToken);
+  return files.map(normalizeDriveFile);
+}
+function uniqueBoardName(base, excludeId = "") {
+  let candidate = base.trim() || "My Board";
+  let suffix = 2;
+  const exists = (name) =>
+    drive.boards.some(
+      (item) =>
+        item.id !== excludeId &&
+        item.name.localeCompare(name, undefined, { sensitivity: "base" }) === 0,
+    );
+  while (exists(candidate)) candidate = `${base.trim() || "My Board"} ${suffix++}`;
+  return candidate;
+}
+async function createDriveBoard(name, contents) {
+  const boundary = "jiayou_" + uid();
+  const metadataObject = {
+    name: driveFileName(name),
+    parents: ["appDataFolder"],
+    mimeType: "application/json",
+    appProperties: { jiayouType: "board", jiayouSchema: "1" },
+  };
+  const metadata = JSON.stringify(metadataObject);
+  const body = JSON.stringify(contents);
+  const multipart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+  const result = await driveRequest(
+    "upload/drive/v3/files?uploadType=multipart&fields=id,name,modifiedTime,appProperties",
+    {
+      method: "POST",
+      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
+      body: multipart,
+    },
+  );
+  return normalizeDriveFile({
+    id: result.id,
+    name: result.name || metadataObject.name,
+    modifiedTime: result.modifiedTime || new Date().toISOString(),
+    appProperties: result.appProperties || metadataObject.appProperties,
+  });
+}
+async function updateDriveBoard(fileId, contents) {
+  await driveRequest(
+    `upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(contents),
+    },
+  );
+}
+async function downloadDriveBoard(item) {
+  const remote = await driveRequest(
+    `drive/v3/files/${encodeURIComponent(item.id)}?alt=media`,
+  );
+  if (!validBoard(remote))
+    throw new Error(`${item.name} has an unsupported board format.`);
+  return remote;
+}
+async function migrateLegacyBoard(item) {
+  if (!item.legacy) return item;
+  const name = uniqueBoardName("My Board", item.id);
+  const metadata = {
+    name: driveFileName(name),
+    appProperties: { jiayouType: "board", jiayouSchema: "1" },
+  };
+  const result = await driveRequest(
+    `drive/v3/files/${encodeURIComponent(item.id)}?fields=id,name,modifiedTime,appProperties`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metadata),
+    },
+  );
+  return normalizeDriveFile({
+    id: item.id,
+    name: result.name || metadata.name,
+    modifiedTime: result.modifiedTime || item.modifiedTime,
+    appProperties: result.appProperties || metadata.appProperties,
+  });
+}
+
+let conflictResolver = null;
+function chooseStartupCopy(name) {
+  $("#conflict-board-name").textContent = name;
+  $("#conflict-dialog").showModal();
+  return new Promise((resolve) => {
+    conflictResolver = resolve;
+  });
+}
+$("#conflict-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const choice = event.submitter?.value === "local" ? "local" : "drive";
+  const resolve = conflictResolver;
+  conflictResolver = null;
+  $("#conflict-dialog").close();
+  resolve?.(choice);
+});
+$("#conflict-dialog").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  const resolve = conflictResolver;
+  conflictResolver = null;
+  $("#conflict-dialog").close();
+  resolve?.("drive");
+});
+
+async function connectDrive() {
+  if (drive.operating) return;
+  drive.operating = true;
+  drive.ready = false;
+  setDriveLoading(true);
+  saveLabel("Loading Drive…", true);
+  try {
+    localStorage.setItem(DRIVE_REMEMBERED_KEY, "1");
+  } catch {
+    storageAvailable = false;
+  }
+  let connected = false;
+  try {
+    drive.boards = await listDriveBoards();
+    let active = drive.boards.find(
+      (item) => item.id === cachedDriveContext?.fileId,
+    );
+    if (!active)
+      active = [...drive.boards].sort((a, b) =>
+        (b.modifiedTime || "").localeCompare(a.modifiedTime || ""),
+      )[0];
+
+    if (!active) {
+      if (!board.updatedAt) board.updatedAt = Date.now();
+      active = await createDriveBoard(uniqueBoardName("My Board"), board);
+      drive.boards.push(active);
+      rememberActiveBoard(active);
+      persist(false);
+    } else {
+      const localBoard = board;
+      const remoteBoard = await downloadDriveBoard(active);
+      const localMatches =
+        cachedDriveContext?.fileId === active.id ||
+        (!cachedDriveContext && active.legacy);
+      const choice =
+        localMatches && localBoard.updatedAt > remoteBoard.updatedAt
+          ? await chooseStartupCopy(active.name)
+          : "drive";
+      if (active.legacy) {
+        const migrated = await migrateLegacyBoard(active);
+        drive.boards.splice(drive.boards.indexOf(active), 1, migrated);
+        active = migrated;
+      }
+      rememberActiveBoard(active);
+      board = choice === "local" ? localBoard : remoteBoard;
+      resetFilters();
+      persist(false);
+      render();
+      if (choice === "local") {
+        drive.ready = true;
+        connected = true;
+        drive.pending = true;
+        if (!(await flushDrive())) return;
       }
     }
     drive.ready = true;
-    drive.pending = true;
-    await flushDrive();
+    connected = true;
+    saveLabel("Autosaved", true);
+    renderDriveBoards();
   } catch (error) {
-    driveError(error);
+    driveError(error, "load boards");
+  } finally {
+    drive.operating = false;
+    setDriveLoading(false);
+    if (connected) renderDriveBoards();
   }
 }
-async function flushDrive() {
-  if (drive.busy || !drive.ready) return;
-  drive.busy = true;
-  try {
-    while (drive.pending) {
-      drive.pending = false;
-      saveLabel("Saving…", true);
-      const body = JSON.stringify(board);
-      if (drive.fileId) {
-        await driveRequest(
-          `upload/drive/v3/files/${encodeURIComponent(drive.fileId)}?uploadType=media`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body,
-          },
-        );
-      } else {
-        const boundary = "jiayou_" + uid();
-        const metadata = JSON.stringify({
-          name: "jiayou-board.json",
-          parents: ["appDataFolder"],
-          mimeType: "application/json",
-        });
-        const multipart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-        const result = await driveRequest(
-          "upload/drive/v3/files?uploadType=multipart&fields=id",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "multipart/related; boundary=" + boundary,
-            },
-            body: multipart,
-          },
-        );
-        drive.fileId = result.id;
+function flushDrive() {
+  if (!drive.ready) return Promise.resolve(false);
+  if (drive.flushPromise) return drive.flushPromise;
+  clearTimeout(drive.timer);
+  drive.flushPromise = (async () => {
+    let saved = true;
+    renderDriveBoards();
+    try {
+      while (drive.pending) {
+        drive.pending = false;
+        saveLabel("Saving…", true);
+        const fileId = drive.fileId;
+        const snapshot = JSON.parse(JSON.stringify(board));
+        await updateDriveBoard(fileId, snapshot);
+        const item = drive.boards.find((candidate) => candidate.id === fileId);
+        if (item) item.modifiedTime = new Date().toISOString();
       }
+      saveLabel("Autosaved", true);
+    } catch (error) {
+      drive.pending = true;
+      saved = false;
+      driveError(error);
+    } finally {
+      drive.flushPromise = null;
+      renderDriveBoards();
     }
+    return saved;
+  })();
+  return drive.flushPromise;
+}
+async function flushBeforeBoardOperation() {
+  clearTimeout(drive.timer);
+  return drive.pending || drive.flushPromise ? flushDrive() : true;
+}
+async function switchDriveBoard(fileId) {
+  if (!drive.ready || fileId === drive.fileId || drive.operating) return;
+  const previousId = drive.fileId;
+  const target = drive.boards.find((item) => item.id === fileId);
+  if (!target) return;
+  drive.operating = true;
+  renderDriveBoards();
+  try {
+    if (!(await flushBeforeBoardOperation())) return;
+    const remote = await downloadDriveBoard(target);
+    rememberActiveBoard(target);
+    board = remote;
+    resetFilters();
+    persist(false);
+    render();
     saveLabel("Autosaved", true);
+    announce(`Opened ${target.name}.`);
   } catch (error) {
-    drive.pending = true;
-    driveError(error);
+    driveError(error, "open that board");
   } finally {
-    drive.busy = false;
+    drive.operating = false;
+    $("#board-select").value = drive.fileId || previousId;
+    renderDriveBoards();
+  }
+}
+
+let nameDialogRequest = null;
+function requestBoardName(mode, initialValue, excludeId = "") {
+  const labels = {
+    create: ["Create board", "Create"],
+    rename: ["Rename board", "Rename"],
+    duplicate: ["Duplicate board", "Duplicate"],
+  };
+  $("#board-name-title").textContent = labels[mode][0];
+  $("#board-name-submit").textContent = labels[mode][1];
+  $("#board-name-input").value = initialValue;
+  $("#board-name-error").textContent = "";
+  $("#board-name-dialog").showModal();
+  $("#board-name-input").focus();
+  $("#board-name-input").select();
+  return new Promise((resolve) => {
+    nameDialogRequest = { resolve, excludeId };
+  });
+}
+$("#board-name-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!nameDialogRequest) return;
+  const name = $("#board-name-input").value.trim();
+  const duplicate = drive.boards.some(
+    (item) =>
+      item.id !== nameDialogRequest.excludeId &&
+      item.name.localeCompare(name, undefined, { sensitivity: "base" }) === 0,
+  );
+  if (!name || name.length > 80) {
+    $("#board-name-error").textContent = "Enter a name from 1 to 80 characters.";
+    return;
+  }
+  if (duplicate) {
+    $("#board-name-error").textContent = "A board with that name already exists.";
+    return;
+  }
+  const resolve = nameDialogRequest.resolve;
+  nameDialogRequest = null;
+  $("#board-name-dialog").close();
+  resolve(name);
+});
+$("#board-name-dialog").addEventListener("close", () => {
+  if ($("#board-name-dialog").open || !nameDialogRequest) return;
+  const resolve = nameDialogRequest.resolve;
+  nameDialogRequest = null;
+  resolve(null);
+});
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+  button.addEventListener("click", () => button.closest("dialog").close());
+});
+
+async function createNamedBoard(name, source) {
+  drive.operating = true;
+  renderDriveBoards();
+  try {
+    if (!(await flushBeforeBoardOperation())) return false;
+    const item = await createDriveBoard(name, source);
+    drive.boards.push(item);
+    rememberActiveBoard(item);
+    board = source;
+    resetFilters();
+    persist(false);
+    render();
+    saveLabel("Autosaved", true);
+    announce(`Created ${name}.`);
+    return true;
+  } catch (error) {
+    driveError(error, "create the board");
+    return false;
+  } finally {
+    drive.operating = false;
+    renderDriveBoards();
+  }
+}
+$("#board-select").addEventListener("change", (event) =>
+  switchDriveBoard(event.target.value),
+);
+$("#new-board").addEventListener("click", async () => {
+  const name = await requestBoardName("create", uniqueBoardName("New Board"));
+  if (!name) return;
+  const created = initialBoard();
+  created.updatedAt = Date.now();
+  await createNamedBoard(name, created);
+});
+$("#manage-board").addEventListener("click", () => {
+  renderDriveBoards();
+  $("#manage-dialog").showModal();
+});
+$("#rename-board").addEventListener("click", async () => {
+  $("#manage-dialog").close();
+  const current = activeDriveBoard();
+  if (!current) return;
+  const name = await requestBoardName("rename", current.name, current.id);
+  if (!name || name === current.name) return;
+  drive.operating = true;
+  renderDriveBoards();
+  try {
+    if (!(await flushBeforeBoardOperation())) return;
+    const metadata = {
+      name: driveFileName(name),
+      appProperties: { jiayouType: "board", jiayouSchema: "1" },
+    };
+    await driveRequest(
+      `drive/v3/files/${encodeURIComponent(current.id)}?fields=id,name,modifiedTime,appProperties`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metadata),
+      },
+    );
+    current.name = name;
+    current.legacy = false;
+    rememberActiveBoard(current);
+    persist(false);
+    announce(`Renamed the board to ${name}.`);
+  } catch (error) {
+    driveError(error, "rename the board");
+  } finally {
+    drive.operating = false;
+    renderDriveBoards();
+  }
+});
+$("#duplicate-board").addEventListener("click", async () => {
+  $("#manage-dialog").close();
+  const current = activeDriveBoard();
+  if (!current) return;
+  const suggested = uniqueBoardName(`${current.name} copy`);
+  const name = await requestBoardName("duplicate", suggested);
+  if (!name) return;
+  const copy = JSON.parse(JSON.stringify(board));
+  copy.columns.forEach((column) =>
+    column.cards.forEach((card) => {
+      card.id = uid();
+    }),
+  );
+  copy.updatedAt = Date.now();
+  await createNamedBoard(name, copy);
+});
+$("#delete-board").addEventListener("click", () => {
+  if (drive.boards.length <= 1) return;
+  $("#manage-dialog").close();
+  $("#delete-board-message").textContent = `Delete ${drive.fileName}?`;
+  $("#delete-board-dialog").showModal();
+});
+$("#delete-board-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("#delete-board-dialog").close();
+  if (drive.boards.length <= 1 || drive.operating) return;
+  const current = activeDriveBoard();
+  const sorted = sortDriveBoards();
+  const index = sorted.findIndex((item) => item.id === current.id);
+  const next = sorted[index + 1] || sorted[index - 1];
+  drive.operating = true;
+  renderDriveBoards();
+  try {
+    if (!(await flushBeforeBoardOperation())) return;
+    const nextBoard = await downloadDriveBoard(next);
+    await driveRequest(`drive/v3/files/${encodeURIComponent(current.id)}`, {
+      method: "DELETE",
+    });
+    drive.boards = drive.boards.filter((item) => item.id !== current.id);
+    rememberActiveBoard(next);
+    board = nextBoard;
+    resetFilters();
+    persist(false);
+    render();
+    saveLabel("Autosaved", true);
+    announce(`Deleted ${current.name}.`);
+  } catch (error) {
+    driveError(error, "delete the board");
+  } finally {
+    drive.operating = false;
+    renderDriveBoards();
+  }
+});
+$("#disconnect-drive").addEventListener("click", async () => {
+  $("#manage-dialog").close();
+  drive.operating = true;
+  renderDriveBoards();
+  if (!(await flushBeforeBoardOperation())) {
+    drive.operating = false;
+    renderDriveBoards();
+    return;
+  }
+  clearAuth(true);
+  persist(false);
+  saveLabel("Save to Drive", false);
+  announce("Google Drive disconnected. This board is still saved on this device.");
+});
+
+function oauthUrl(silent, state) {
+  const config = window.JIAYOU_CONFIG;
+  const params = new URLSearchParams({
+    client_id: config.googleClientId,
+    redirect_uri: config.redirectUri || location.origin + location.pathname,
+    response_type: "token",
+    scope: "https://www.googleapis.com/auth/drive.appdata",
+    state,
+    include_granted_scopes: "true",
+  });
+  if (silent) params.set("prompt", "none");
+  return "https://accounts.google.com/o/oauth2/v2/auth?" + params;
+}
+function startOAuth(silent = false) {
+  const config = window.JIAYOU_CONFIG;
+  if (!config?.googleClientId) {
+    if (!silent) $("#setup").showModal();
+    else {
+      try {
+        localStorage.removeItem(DRIVE_REMEMBERED_KEY);
+      } catch {
+        /* Storage may be restricted. */
+      }
+      setDriveLoading(false);
+    }
+    return false;
+  }
+  try {
+    const state = uid() + uid();
+    sessionStorage.setItem(OAUTH_STATE_KEY, state);
+    sessionStorage.setItem(OAUTH_MODE_KEY, silent ? "silent" : "interactive");
+    location.assign(oauthUrl(silent, state));
+    return true;
+  } catch {
+    setDriveLoading(false);
+    announce("Sign-in needs browser storage enabled.");
+    return false;
   }
 }
 $("#save").addEventListener("click", () => {
@@ -1231,23 +1744,9 @@ $("#save").addEventListener("click", () => {
     connectDrive();
     return;
   }
-  const config = window.JIAYOU_CONFIG;
-  if (!config?.googleClientId) {
-    $("#setup").showModal();
-    return;
-  }
   try {
-    const state = uid() + uid();
-    sessionStorage.setItem("jiayou.oauth.state", state);
-    const params = new URLSearchParams({
-      client_id: config.googleClientId,
-      redirect_uri: config.redirectUri || location.origin + location.pathname,
-      response_type: "token",
-      scope: "https://www.googleapis.com/auth/drive.appdata",
-      state,
-      include_granted_scopes: "true",
-    });
-    location.assign("https://accounts.google.com/o/oauth2/v2/auth?" + params);
+    sessionStorage.removeItem(OAUTH_SILENT_ATTEMPT_KEY);
+    startOAuth(false);
   } catch {
     announce("Sign-in needs session storage enabled in your browser.");
   }
@@ -1256,32 +1755,55 @@ function restoreAuth() {
   try {
     const fragment = new URLSearchParams(location.hash.slice(1));
     if (fragment.has("access_token") || fragment.has("error")) {
-      const expected = sessionStorage.getItem("jiayou.oauth.state");
-      sessionStorage.removeItem("jiayou.oauth.state");
+      const expected = sessionStorage.getItem(OAUTH_STATE_KEY);
+      const mode = sessionStorage.getItem(OAUTH_MODE_KEY);
+      sessionStorage.removeItem(OAUTH_STATE_KEY);
+      sessionStorage.removeItem(OAUTH_MODE_KEY);
       history.replaceState(null, "", location.pathname + location.search);
       if (!expected || fragment.get("state") !== expected)
         throw new Error("Sign-in could not be verified. Please try again.");
+      if (fragment.has("error") && mode === "silent") {
+        localStorage.removeItem(DRIVE_REMEMBERED_KEY);
+        sessionStorage.removeItem(OAUTH_SILENT_ATTEMPT_KEY);
+        clearAuth(false);
+        saveLabel("Save to Drive", false);
+        announce("Your Google session ended. Connect Drive to sign in again.");
+        return;
+      }
       if (fragment.has("error"))
         throw new Error("Google sign-in was cancelled or denied.");
       const seconds = Number(fragment.get("expires_in"));
       if (!(seconds > 0) || !fragment.get("access_token"))
         throw new Error("Google returned an invalid session.");
       sessionStorage.setItem(
-        "jiayou.oauth.token",
+        OAUTH_TOKEN_KEY,
         JSON.stringify({
           token: fragment.get("access_token"),
           expires: Date.now() + seconds * 1000 - 30000,
         }),
       );
+      sessionStorage.removeItem(OAUTH_SILENT_ATTEMPT_KEY);
+      localStorage.setItem(DRIVE_REMEMBERED_KEY, "1");
     }
-    const saved = JSON.parse(sessionStorage.getItem("jiayou.oauth.token"));
+    const saved = JSON.parse(sessionStorage.getItem(OAUTH_TOKEN_KEY));
     if (saved?.token && saved.expires > Date.now()) {
       drive.token = saved.token;
       drive.expires = saved.expires;
       connectDrive();
+      return;
+    }
+    if (
+      navigator.onLine &&
+      localStorage.getItem(DRIVE_REMEMBERED_KEY) === "1" &&
+      !sessionStorage.getItem(OAUTH_SILENT_ATTEMPT_KEY)
+    ) {
+      sessionStorage.setItem(OAUTH_SILENT_ATTEMPT_KEY, "1");
+      setDriveLoading(true);
+      saveLabel("Connecting…", true);
+      startOAuth(true);
     }
   } catch (error) {
-    clearAuth();
+    clearAuth(false);
     announce(error.message || "Could not restore Google session.");
   }
 }
@@ -1289,6 +1811,8 @@ window.addEventListener("online", () => {
   if (drive.ready) {
     drive.pending = true;
     flushDrive();
+  } else {
+    restoreAuth();
   }
 });
 function setRandomTagline() {

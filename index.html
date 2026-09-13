@@ -7,6 +7,7 @@
     <meta name="referrer" content="no-referrer" />
     <title>JIAYOU! — Kanban</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <script src="./config.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
@@ -52,6 +53,29 @@
           </button>
         </div>
       </header>
+      <section
+        id="board-manager"
+        class="board-manager"
+        aria-label="Drive boards"
+        hidden
+      >
+        <label for="board-select">Board</label>
+        <select id="board-select" aria-label="Active Drive board"></select>
+        <button
+          id="new-board"
+          class="button board-manager-button"
+          type="button"
+        >
+          New
+        </button>
+        <button
+          id="manage-board"
+          class="button board-manager-button"
+          type="button"
+        >
+          Manage
+        </button>
+      </section>
       <div class="toolbar">
         <div class="search">
           <img
@@ -131,6 +155,90 @@
           README.md for setup instructions.
         </p>
         <button class="button">Got it</button>
+      </form>
+    </dialog>
+    <dialog id="manage-dialog">
+      <form method="dialog">
+        <h2>Manage board</h2>
+        <p id="manage-board-name"></p>
+        <div class="dialog-actions dialog-actions-stack">
+          <button id="rename-board" class="button" type="button">Rename</button>
+          <button id="duplicate-board" class="button" type="button">
+            Duplicate
+          </button>
+          <button id="delete-board" class="button danger-button" type="button">
+            Delete
+          </button>
+          <button id="disconnect-drive" class="button" type="button">
+            Disconnect Drive
+          </button>
+          <button class="button" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="board-name-dialog">
+      <form id="board-name-form">
+        <h2 id="board-name-title">Name board</h2>
+        <label class="dialog-field" for="board-name-input">
+          Board name
+          <input
+            id="board-name-input"
+            type="text"
+            maxlength="80"
+            autocomplete="off"
+          />
+        </label>
+        <p id="board-name-error" class="dialog-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="button" type="button" data-close-dialog>Cancel</button>
+          <button id="board-name-submit" class="button" type="submit">
+            Save
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="delete-board-dialog">
+      <form id="delete-board-form">
+        <h2>Delete board?</h2>
+        <p id="delete-board-message"></p>
+        <p>
+          This file is in Drive's hidden app-data folder and will be permanently
+          deleted.
+        </p>
+        <div class="dialog-actions">
+          <button class="button" type="button" data-close-dialog>Cancel</button>
+          <button class="button danger-button" type="submit">
+            Delete permanently
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="conflict-dialog">
+      <form id="conflict-form">
+        <h2>Choose which copy to keep</h2>
+        <p>
+          This device has newer changes for
+          <strong id="conflict-board-name"></strong>
+          than the copy in Google Drive.
+        </p>
+        <div class="dialog-actions">
+          <button
+            id="use-drive-board"
+            class="button"
+            type="submit"
+            value="drive"
+          >
+            Use Drive
+          </button>
+          <button
+            id="use-local-board"
+            class="button"
+            type="submit"
+            value="local"
+          >
+            Use this device
+          </button>
+        </div>
       </form>
     </dialog>
   </body>

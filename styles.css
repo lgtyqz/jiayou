@@ -156,6 +156,39 @@ h2 {
   width: 16px;
   height: 16px;
 }
+.board-manager {
+  min-height: 43px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.board-manager[hidden] {
+  display: none;
+}
+.board-manager label {
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.board-manager select {
+  width: min(280px, 40vw);
+  height: 35px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  background: white;
+  font-size: 12px;
+}
+.board-manager-button {
+  min-width: 78px;
+}
+.drive-loading .board,
+.drive-loading .toolbar,
+.drive-loading .board-manager {
+  opacity: 0.55;
+}
 .toolbar {
   display: flex;
   justify-content: space-between;
@@ -621,6 +654,42 @@ dialog p {
   line-height: 1.5;
   margin-bottom: 15px;
 }
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.dialog-actions-stack {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.dialog-field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+.dialog-field input {
+  width: min(340px, 72vw);
+  height: 38px;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+  padding: 0 10px;
+}
+.dialog-error {
+  min-height: 21px;
+  margin: 3px 0 10px;
+  color: #994c4c;
+  font-size: 12px;
+}
+.danger-button {
+  border-color: #c99595;
+  color: #8a3030;
+}
+.danger-button:hover {
+  background: #fff1f1;
+}
 @media (min-width: 1000px) {
   .board {
     min-height: calc(100vh - 215px);
@@ -637,6 +706,18 @@ dialog p {
   }
   .board-actions {
     top: 23px;
+  }
+  .board-manager {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .board-manager select {
+    width: min(190px, 43vw);
+    flex: none;
+  }
+  .board-manager-button {
+    min-width: 68px;
+    padding: 0 10px;
   }
   .cat {
     left: 50px;
