@@ -32,6 +32,13 @@ assert.deepEqual(
   ],
 );
 assert.equal(await evaluate('[...document.images].every(i=>i.complete && i.naturalWidth>0)'),true);
+assert.deepEqual(
+  await evaluate('[...document.querySelectorAll(".footer-links a")].map(link=>({text:link.textContent,href:new URL(link.href).pathname}))'),
+  [
+    {text:'Privacy',href:'/privacy.html'},
+    {text:'Terms',href:'/terms.html'},
+  ],
+);
 assert.equal(await evaluate('["#import-board","#download-board"].every(selector=>document.querySelector(selector).textContent.trim()===""&&document.querySelector(selector).querySelector("img"))'),true);
 assert.equal(await evaluate('(()=>{const imported=document.querySelector("#import-board").getBoundingClientRect();const downloaded=document.querySelector("#download-board").getBoundingClientRect();const saved=document.querySelector("#save").getBoundingClientRect();return imported.right<downloaded.left&&downloaded.right<saved.left&&imported.height===saved.height&&downloaded.height===saved.height})()'),true);
 const screenshot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-desktop.png',Buffer.from(screenshot.data,'base64'));
@@ -291,6 +298,18 @@ await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickC
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),0);
 assert.equal(await evaluate('JSON.parse(localStorage.getItem("jiayou.board.v1")).columns.every(column=>column.cards.length===0)'),true);
 assert.equal(errors.length,0);
+await call('Emulation.setDeviceMetricsOverride',{width:900,height:800,deviceScaleFactor:1,mobile:false});
+await call('Page.navigate',{url:'http://localhost:8000/privacy.html'});await sleep(350);
+assert.equal(await evaluate('document.querySelector("h1").textContent'),'Privacy Policy');
+assert.equal(await evaluate('document.body.textContent.includes("drive.appdata")'),true);
+assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
+const privacyShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await fs.writeFile('/tmp/jiayou-privacy.png',Buffer.from(privacyShot.data,'base64'));
+await call('Page.navigate',{url:'http://localhost:8000/terms.html'});await sleep(350);
+assert.equal(await evaluate('document.querySelector("h1").textContent'),'Terms of Service');
+assert.equal(await evaluate('document.querySelector("a[href="+JSON.stringify("./privacy.html")+"]")!==null'),true);
+assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
+const termsShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await fs.writeFile('/tmp/jiayou-terms.png',Buffer.from(termsShot.data,'base64'));
+assert.equal(errors.length,0);
 console.log('PASS: star palette color changes and persistence, no priority side effects, combined text/color filtering, All colors, Escape/outside dismissal, keyboard selection, create reset, mobile positioning.');
-console.log('PASS: assets, creation, inline edit, fuzzy search, priority, collapse, pointer drag physics/create/move/delete, hold-to-clear cancellation/countdown/wiggle/fade/persistence, reload persistence, Drive setup, mocked multi-board listing/conflicts/lifecycle/safe switching/autosave/failure/retry/expiry/disconnect, mobile overflow, no runtime errors.');
+console.log('PASS: assets, creation, inline edit, fuzzy search, priority, collapse, pointer drag physics/create/move/delete, hold-to-clear cancellation/countdown/wiggle/fade/persistence, reload persistence, Drive setup, mocked multi-board listing/conflicts/lifecycle/safe switching/autosave/failure/retry/expiry/disconnect, legal pages, mobile overflow, no runtime errors.');
 ws.close();

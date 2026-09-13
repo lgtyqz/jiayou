@@ -44,7 +44,7 @@ All app references are relative, so the repository subpath works. `.nojekyll` ke
 The app works locally without Google configuration. To activate **Save to Drive**:
 
 1. Create a Google Cloud project and enable **Google Drive API**.
-2. Configure Google Auth Platform branding, audience, and consent. While the app is in Testing, add your Google account as a test user.
+2. Configure Google Auth Platform branding, audience, and consent. Use `https://lgtyqz.github.io/jiayou/` as the application home page, `https://lgtyqz.github.io/jiayou/privacy.html` as the privacy-policy URL, and `https://lgtyqz.github.io/jiayou/terms.html` as the terms-of-service URL. While the app is in Testing, add your Google account as a test user.
 3. Add the scope `https://www.googleapis.com/auth/drive.appdata`.
 4. Create an OAuth client with application type **Web application**.
 5. Add authorized JavaScript origin `https://lgtyqz.github.io` and authorized redirect URI **`https://lgtyqz.github.io/jiayou/`**. For local development, add origin `http://localhost:8000` and redirect URI `http://localhost:8000/`.

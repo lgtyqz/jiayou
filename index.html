@@ -165,11 +165,17 @@
         </div>
         <div id="board" class="board" aria-label="Kanban board"></div>
       </div>
-      <footer>
+      <footer class="board-footer">
         <span
           title="Right-click a card to prioritize it, or drag it into Priority on touch screens. Click its star to change color."
           >Right-click a card to prioritize</span
-        ><span id="local-status" role="status">Saved on this device</span>
+        >
+        <nav class="footer-links" aria-label="Legal">
+          <a href="./privacy.html">Privacy</a>
+          <span aria-hidden="true">·</span>
+          <a href="./terms.html">Terms</a>
+        </nav>
+        <span id="local-status" role="status">Saved on this device</span>
       </footer>
       <p id="message" class="message" role="status" aria-live="polite"></p>
     </main>

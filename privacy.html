@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Privacy Policy — JIAYOU!</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+  </head>
+  <body>
+    <main class="legal-page">
+      <img class="privacy-cat" src="./assets/privacyCat.svg" alt="" />
+      <header class="legal-header">
+        <a class="legal-brand" href="./" aria-label="Return to JIAYOU board"
+          >JIAYOU!</a
+        >
+        <p>Your personal Kanban board</p>
+      </header>
+
+      <article class="legal-card">
+        <h1>Privacy Policy</h1>
+        <p class="legal-meta">Last updated: September 12, 2026</p>
+
+        <p>
+          This policy explains how JIAYOU! (the “Service”) handles information
+          when you use the Kanban board at
+          <a href="https://lgtyqz.github.io/jiayou/">lgtyqz.github.io/jiayou</a
+          >. JIAYOU is a static web application: the current version has no
+          developer-operated application server, user-account database,
+          analytics, or advertising.
+        </p>
+
+        <h2>Information the Service handles</h2>
+        <ul>
+          <li>
+            <strong>Board information.</strong> Card titles, descriptions,
+            categories, colors, positions, board names, and related board
+            settings that you enter or import.
+          </li>
+          <li>
+            <strong>Browser storage.</strong> The active board is saved in local
+            storage. If you connect Google Drive, local storage also remembers
+            that choice and the active Drive file’s ID and name.
+          </li>
+          <li>
+            <strong>Google authorization.</strong> A short-lived Google OAuth
+            access token is kept in session storage. It is not placed in local
+            storage. JIAYOU does not request your Google profile, contacts,
+            email, or ordinary Drive files.
+          </li>
+          <li>
+            <strong>Hosting information.</strong> GitHub Pages hosts the site.
+            GitHub states that it logs visitors’ IP addresses for security and
+            may process other service usage information under its own privacy
+            statement. JIAYOU’s maintainer does not receive board contents
+            through GitHub Pages.
+          </li>
+        </ul>
+
+        <h2>Google Drive data</h2>
+        <p>
+          Connecting Google Drive is optional. If you choose it, JIAYOU requests
+          only the
+          <code>https://www.googleapis.com/auth/drive.appdata</code> scope. This
+          lets the app create, list, read, update, rename, duplicate, and delete
+          JIAYOU board files in Google Drive’s hidden application-data folder.
+          It does not grant access to files elsewhere in your Drive.
+        </p>
+        <p>
+          Drive requests and board contents travel directly between your browser
+          and Google over HTTPS. The project maintainer does not operate a
+          backend that receives or stores your Google access token or Drive
+          board contents.
+        </p>
+        <p>
+          JIAYOU’s use and transfer to any other app of information received
+          from Google APIs adheres to the
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            >Google API Services User Data Policy</a
+          >, including its Limited Use requirements.
+        </p>
+
+        <h2>How information is used and shared</h2>
+        <p>
+          Information is used only to display your boards, preserve edits,
+          import or download board files, and provide the optional Drive sync
+          features you request. JIAYOU does not sell personal information, use
+          it for advertising, or share it with data brokers.
+        </p>
+        <p>
+          Information is transmitted to Google only when you use Drive features.
+          GitHub processes basic hosting data as the site host. Their practices
+          are governed by the
+          <a href="https://policies.google.com/privacy"
+            >Google Privacy Policy</a
+          >
+          and
+          <a
+            href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+            >GitHub Privacy Statement</a
+          >.
+        </p>
+
+        <h2>Retention, deletion, and your choices</h2>
+        <ul>
+          <li>
+            Local board data remains in your browser until you clear this site’s
+            stored data. Download a board first if you want a backup.
+          </li>
+          <li>
+            OAuth access tokens remain in session storage until they expire, you
+            disconnect Drive, or the browser session removes them.
+          </li>
+          <li>
+            <strong>Disconnect Drive</strong> removes JIAYOU’s locally stored
+            connection state but does not delete boards already stored in Drive
+            or revoke Google consent.
+          </li>
+          <li>
+            Use <strong>Manage → Delete</strong> to permanently delete a Drive
+            board. Google’s application-data folder does not support trash, so
+            this cannot be undone.
+          </li>
+          <li>
+            You can revoke JIAYOU’s Google access from your
+            <a href="https://myaccount.google.com/connections"
+              >Google Account connections</a
+            >. Google also lets you remove the app’s hidden application data.
+          </li>
+        </ul>
+
+        <h2>Security</h2>
+        <p>
+          The published site and Google API requests use HTTPS. The Service
+          limits Google access to its own application-data folder and keeps
+          access tokens out of persistent local storage. No web application can
+          guarantee absolute security, so avoid placing information in a board
+          that you would not want stored on your device or in your Google
+          account.
+        </p>
+
+        <h2>Children</h2>
+        <p>
+          The Service is not directed to children under 13, and it does not
+          knowingly collect personal information from children. Google Drive is
+          optional; the board remains usable without signing in.
+        </p>
+
+        <h2>Changes and contact</h2>
+        <p>
+          This policy may be updated if the Service’s data practices change. The
+          date above will be revised when that happens. Questions or requests
+          can be submitted through the
+          <a href="https://github.com/lgtyqz/jiayou/issues"
+            >JIAYOU GitHub issue tracker</a
+          >. Issues are public, so do not include access tokens, board contents,
+          or other sensitive information.
+        </p>
+      </article>
+
+      <footer class="legal-footer">
+        <a href="./">Board</a>
+        <span aria-hidden="true">·</span>
+        <a href="./terms.html">Terms of Service</a>
+      </footer>
+    </main>
+  </body>
+</html>
