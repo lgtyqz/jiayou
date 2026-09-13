@@ -92,6 +92,8 @@ await evaluate('window.testClientId=window.JIAYOU_CONFIG.googleClientId;window.J
 // Exercise Drive's native REST integration without a real account or credentials.
 await evaluate(`window.driveCalls=[];window.realFetch=window.fetch;drive.token='test-token';drive.expires=Date.now()+60000;window.fetch=async(url,options={})=>{driveCalls.push({url,options});return new Response(JSON.stringify(url.includes('spaces=')?{files:[]}:url.includes('uploadType=multipart')?{id:'test-file'}:{}),{status:200,headers:{'Content-Type':'application/json'}})};connectDrive()`);
 assert.equal(await evaluate('document.querySelector("#save").textContent'),'Autosaved');
+assert.equal(await evaluate('document.querySelector("#drive-connection-status").hidden'),false);
+assert.equal(await evaluate('document.querySelector("#drive-connection-status").textContent.trim()'),'CONNECTED TO DRIVE');
 assert.equal(await evaluate('driveCalls.filter(c=>c.options.method==="POST").length'),1);
 await evaluate('board.columns[0].cards[0].title="Autosave test";persist()');await sleep(800);
 assert.equal(await evaluate('driveCalls.filter(c=>c.options.method==="PATCH").length'),1);
@@ -112,7 +114,9 @@ await evaluate(`(()=>{
   ]);
   window.driveDeleted=[];
   window.failNextBoardSave=false;
+  window.driveDelay=0;
   window.fetch=async(url,options={})=>{
+    if(driveDelay)await new Promise(resolve=>setTimeout(resolve,driveDelay));
     const parsed=new URL(url);const method=options.method||'GET';
     if(parsed.pathname==='/drive/v3/files'&&method==='GET'){
       const all=[...driveStore.values()];const second=parsed.searchParams.get('pageToken')==='second';
@@ -168,18 +172,26 @@ await click('#new-board');await evaluate('document.querySelector("#board-name-in
 assert.equal(await evaluate('drive.fileName'),'Project');
 assert.equal(await evaluate('board.columns.reduce((sum,column)=>sum+column.cards.length,0)'),9);
 // Rename and duplicate through the management UI.
-await click('#manage-board');await click('#rename-board');await evaluate('document.querySelector("#board-name-input").value="Roadmap"');await click('#board-name-submit');await sleep(100);
+await click('#manage-board');
+assert.equal(await evaluate('document.querySelector("#manage-dialog").getAnimations().some(animation=>animation.animationName==="manage-dialog-in")'),true);
+await click('#rename-board');
+assert.equal(await evaluate('document.querySelector("#manage-dialog").open&&document.querySelector("#manage-dialog").classList.contains("closing")'),true);
+await sleep(120);await evaluate('document.querySelector("#board-name-input").value="Roadmap"');await click('#board-name-submit');await sleep(100);
 assert.equal(await evaluate('drive.fileName'),'Roadmap');
-await click('#manage-board');await click('#duplicate-board');await click('#board-name-submit');await sleep(100);
+await click('#manage-board');await click('#duplicate-board');await sleep(120);await click('#board-name-submit');await sleep(100);
 assert.equal(await evaluate('drive.fileName'),'Roadmap copy');
 assert.equal(await evaluate(`(()=>{const source=[...driveStore.values()].find(file=>file.name==='Roadmap.jiayou.json').board;const copy=[...driveStore.values()].find(file=>file.name==='Roadmap copy.jiayou.json').board;return source.columns[0].cards[0].id!==copy.columns[0].cards[0].id})()`),true);
 // Deleting is permanent and chooses the next board alphabetically.
 const duplicateId=await evaluate('drive.fileId');
-await click('#manage-board');await click('#delete-board');await click('#delete-board-form button[type="submit"]');await sleep(100);
+await click('#manage-board');await click('#delete-board');await sleep(120);await click('#delete-board-form button[type="submit"]');await sleep(100);
 assert.equal(await evaluate(`driveDeleted.includes(${JSON.stringify(duplicateId)})`),true);
 assert.equal(await evaluate('drive.fileName'),'Zenith');
 // A switch flushes edits to the old file before loading the target.
-await evaluate('board.columns[0].cards[0].title="Saved to Zenith";persist();document.querySelector("#board-select").value="board-a";document.querySelector("#board-select").dispatchEvent(new Event("change"))');await sleep(150);
+await evaluate('driveDelay=120;board.columns[0].cards[0].title="Saved to Zenith";persist();document.querySelector("#board-select").value="board-a";document.querySelector("#board-select").dispatchEvent(new Event("change"))');
+assert.equal(await evaluate('document.querySelector("#board-loading").hidden'),false);
+assert.equal(await evaluate('document.querySelector("#board-loading-text").textContent'),'Loading Alpha…');
+const loadingShot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-loading.png',Buffer.from(loadingShot.data,'base64'));
+await evaluate('driveDelay=0');await sleep(250);
 assert.equal(await evaluate('driveStore.get("board-z").board.columns[0].cards[0].title'),'Saved to Zenith');
 assert.equal(await evaluate('drive.fileName'),'Alpha');
 // A failed outgoing save blocks the requested switch and retains its local fallback.
@@ -206,7 +218,7 @@ assert.equal(await evaluate('driveStore.get("legacy").name'),'My Board.jiayou.js
 assert.equal(await evaluate('board.columns[0].cards[0].title'),'Legacy board');
 assert.equal(await evaluate('new URL(oauthUrl(true,"state")).searchParams.get("prompt")'),'none');
 assert.equal(await evaluate('localStorage.getItem(OAUTH_TOKEN_KEY)'),null);
-await click('#manage-board');await click('#disconnect-drive');await sleep(50);
+await click('#manage-board');await click('#disconnect-drive');await sleep(180);
 assert.equal(await evaluate('localStorage.getItem(DRIVE_REMEMBERED_KEY)'),null);
 assert.equal(await evaluate('localStorage.getItem(DRIVE_CONTEXT_KEY)'),null);
 assert.equal(await evaluate('document.querySelector("#board-manager").hidden'),true);

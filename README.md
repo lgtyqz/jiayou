@@ -2,6 +2,10 @@
 
 A minimal Kanban board built with vanilla JavaScript, HTML, and CSS from the supplied Figma frames. No build step, package installation, runtime libraries, or backend is required. Figma SVG assets and Urbanist are served locally.
 
+## Code layout
+
+Application code lives in `scripts/` and is loaded in dependency order by `index.html`: `state.js` owns the board model and persistence, `board.js` renders and filters cards, `drag.js` handles movement, and `board-actions.js` covers local board controls. Drive integration is split between `drive-api.js`, `drive-boards.js`, and `oauth.js`; `main.js` performs final startup.
+
 ## Run locally
 
 ```sh

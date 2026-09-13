@@ -9,7 +9,14 @@
     <link rel="stylesheet" href="./styles.css" />
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <script src="./config.js" defer></script>
-    <script src="./app.js" defer></script>
+    <script src="./scripts/state.js" defer></script>
+    <script src="./scripts/board.js" defer></script>
+    <script src="./scripts/drag.js" defer></script>
+    <script src="./scripts/board-actions.js" defer></script>
+    <script src="./scripts/drive-api.js" defer></script>
+    <script src="./scripts/drive-boards.js" defer></script>
+    <script src="./scripts/oauth.js" defer></script>
+    <script src="./scripts/main.js" defer></script>
   </head>
   <body>
     <main class="app">
@@ -24,33 +31,43 @@
         <h1 class="text-title">JIAYOU!</h1>
         <p id="tagline" class="tagline">all according to plant</p>
         <div class="board-actions">
-          <button
-            id="import-board"
-            class="button board-file-button"
-            type="button"
-            title="Import board"
-            aria-label="Import board"
-          >
-            <img src="./assets/import.svg" alt="" width="16" height="16" />
-          </button>
-          <input
-            id="board-file-input"
-            type="file"
-            accept=".json,application/json"
+          <div class="board-action-buttons">
+            <button
+              id="import-board"
+              class="button board-file-button"
+              type="button"
+              title="Import board"
+              aria-label="Import board"
+            >
+              <img src="./assets/import.svg" alt="" width="16" height="16" />
+            </button>
+            <input
+              id="board-file-input"
+              type="file"
+              accept=".json,application/json"
+              hidden
+            />
+            <button
+              id="download-board"
+              class="button board-file-button"
+              type="button"
+              title="Download board"
+              aria-label="Download board"
+            >
+              <img src="./assets/download.svg" alt="" width="16" height="16" />
+            </button>
+            <button id="save" class="button save" type="button">
+              Save to Drive
+            </button>
+          </div>
+          <span
+            id="drive-connection-status"
+            class="drive-connection-status"
+            role="status"
+            aria-live="polite"
             hidden
-          />
-          <button
-            id="download-board"
-            class="button board-file-button"
-            type="button"
-            title="Download board"
-            aria-label="Download board"
+            >CONNECTED TO DRIVE</span
           >
-            <img src="./assets/download.svg" alt="" width="16" height="16" />
-          </button>
-          <button id="save" class="button save" type="button">
-            Save to Drive
-          </button>
         </div>
       </header>
       <section
@@ -134,7 +151,20 @@
           </button>
         </div>
       </div>
-      <div id="board" class="board" aria-label="Kanban board"></div>
+      <div class="board-frame">
+        <div
+          id="board-loading"
+          class="board-loading"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          hidden
+        >
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <span id="board-loading-text">Loading board…</span>
+        </div>
+        <div id="board" class="board" aria-label="Kanban board"></div>
+      </div>
       <footer>
         <span
           title="Right-click a card to prioritize it, or drag it into Priority on touch screens. Click its star to change color."
@@ -158,7 +188,7 @@
       </form>
     </dialog>
     <dialog id="manage-dialog">
-      <form method="dialog">
+      <form>
         <h2>Manage board</h2>
         <p id="manage-board-name"></p>
         <div class="dialog-actions dialog-actions-stack">
@@ -172,7 +202,9 @@
           <button id="disconnect-drive" class="button" type="button">
             Disconnect Drive
           </button>
-          <button class="button" value="cancel">Close</button>
+          <button id="close-manage-dialog" class="button" type="button">
+            Close
+          </button>
         </div>
       </form>
     </dialog>
