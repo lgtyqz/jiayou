@@ -4,24 +4,24 @@
 let conflictResolver = null;
 function chooseStartupCopy(name) {
   $("#conflict-board-name").textContent = name;
-  $("#conflict-dialog").showModal();
+  openDialog($("#conflict-dialog"));
   return new Promise((resolve) => {
     conflictResolver = resolve;
   });
 }
-$("#conflict-form").addEventListener("submit", (event) => {
+$("#conflict-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const choice = event.submitter?.value === "local" ? "local" : "drive";
   const resolve = conflictResolver;
   conflictResolver = null;
-  $("#conflict-dialog").close();
+  await closeDialog($("#conflict-dialog"));
   resolve?.(choice);
 });
-$("#conflict-dialog").addEventListener("cancel", (event) => {
+$("#conflict-dialog").addEventListener("cancel", async (event) => {
   event.preventDefault();
   const resolve = conflictResolver;
   conflictResolver = null;
-  $("#conflict-dialog").close();
+  await closeDialog($("#conflict-dialog"));
   resolve?.("drive");
 });
 
@@ -167,14 +167,14 @@ function requestBoardName(mode, initialValue, excludeId = "") {
   $("#board-name-submit").textContent = labels[mode][1];
   $("#board-name-input").value = initialValue;
   $("#board-name-error").textContent = "";
-  $("#board-name-dialog").showModal();
+  openDialog($("#board-name-dialog"));
   $("#board-name-input").focus();
   $("#board-name-input").select();
   return new Promise((resolve) => {
     nameDialogRequest = { resolve, excludeId };
   });
 }
-$("#board-name-form").addEventListener("submit", (event) => {
+$("#board-name-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!nameDialogRequest) return;
   const name = $("#board-name-input").value.trim();
@@ -193,7 +193,7 @@ $("#board-name-form").addEventListener("submit", (event) => {
   }
   const resolve = nameDialogRequest.resolve;
   nameDialogRequest = null;
-  $("#board-name-dialog").close();
+  await closeDialog($("#board-name-dialog"));
   resolve(name);
 });
 $("#board-name-dialog").addEventListener("close", () => {
@@ -202,10 +202,6 @@ $("#board-name-dialog").addEventListener("close", () => {
   nameDialogRequest = null;
   resolve(null);
 });
-document.querySelectorAll("[data-close-dialog]").forEach((button) => {
-  button.addEventListener("click", () => button.closest("dialog").close());
-});
-
 async function createNamedBoard(name, source, loadingText = "Creating board…") {
   drive.operating = true;
   setDriveLoading(true, loadingText);
@@ -241,32 +237,13 @@ $("#new-board").addEventListener("click", async () => {
   created.updatedAt = Date.now();
   await createNamedBoard(name, created, "Creating board…");
 });
-const MANAGE_DIALOG_CLOSE_MS = 140;
-let manageDialogClosePromise = null;
 function openManageDialog() {
   const dialog = $("#manage-dialog");
-  dialog.classList.remove("closing");
   renderDriveBoards();
-  dialog.showModal();
+  openDialog(dialog);
 }
 function closeManageDialog() {
-  const dialog = $("#manage-dialog");
-  if (!dialog.open) return Promise.resolve();
-  if (manageDialogClosePromise) return manageDialogClosePromise;
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    dialog.close();
-    return Promise.resolve();
-  }
-  dialog.classList.add("closing");
-  manageDialogClosePromise = new Promise((resolve) => {
-    setTimeout(() => {
-      dialog.close();
-      dialog.classList.remove("closing");
-      manageDialogClosePromise = null;
-      resolve();
-    }, MANAGE_DIALOG_CLOSE_MS);
-  });
-  return manageDialogClosePromise;
+  return closeDialog($("#manage-dialog"));
 }
 $("#manage-board").addEventListener("click", openManageDialog);
 $("#close-manage-dialog").addEventListener("click", closeManageDialog);
@@ -330,11 +307,11 @@ $("#delete-board").addEventListener("click", async () => {
   if (drive.boards.length <= 1) return;
   await closeManageDialog();
   $("#delete-board-message").textContent = `Delete ${drive.fileName}?`;
-  $("#delete-board-dialog").showModal();
+  openDialog($("#delete-board-dialog"));
 });
 $("#delete-board-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  $("#delete-board-dialog").close();
+  await closeDialog($("#delete-board-dialog"));
   if (drive.boards.length <= 1 || drive.operating) return;
   const current = activeDriveBoard();
   const sorted = sortDriveBoards();
@@ -381,4 +358,3 @@ $("#disconnect-drive").addEventListener("click", async () => {
   saveLabel("Save to Drive", false);
   announce("Google Drive disconnected. This board is still saved on this device.");
 });
-

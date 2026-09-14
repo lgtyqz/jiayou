@@ -10,6 +10,7 @@
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <script src="./config.js" defer></script>
     <script src="./scripts/state.js" defer></script>
+    <script src="./scripts/dialogs.js" defer></script>
     <script src="./scripts/board.js" defer></script>
     <script src="./scripts/drag.js" defer></script>
     <script src="./scripts/board-actions.js" defer></script>
@@ -180,7 +181,7 @@
       <p id="message" class="message" role="status" aria-live="polite"></p>
     </main>
     <dialog id="setup">
-      <form method="dialog">
+      <form>
         <h2>Connect Google Drive</h2>
         <p>
           Google Drive isn't configured for this site yet. Your board is still
@@ -190,7 +191,20 @@
           The site owner needs to add a Google OAuth client ID in config.js. See
           README.md for setup instructions.
         </p>
-        <button class="button">Got it</button>
+        <button class="button" type="button" data-close-dialog>Got it</button>
+      </form>
+    </dialog>
+    <dialog id="drive-disconnected-dialog">
+      <form>
+        <h2>Google Drive disconnected</h2>
+        <p>
+          This device is no longer connected to Google Drive. Your board is
+          still saved on this device.
+        </p>
+        <p>Choose Save to Drive when you're ready to reconnect.</p>
+        <div class="dialog-actions">
+          <button class="button" type="button" data-close-dialog>Got it</button>
+        </div>
       </form>
     </dialog>
     <dialog id="manage-dialog">

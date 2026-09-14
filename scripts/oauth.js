@@ -17,7 +17,7 @@ function oauthUrl(silent, state) {
 function startOAuth(silent = false) {
   const config = window.JIAYOU_CONFIG;
   if (!config?.googleClientId) {
-    if (!silent) $("#setup").showModal();
+    if (!silent) openDialog($("#setup"));
     else {
       try {
         localStorage.removeItem(DRIVE_REMEMBERED_KEY);
@@ -75,6 +75,7 @@ function restoreAuth() {
         clearAuth(false);
         saveLabel("Save to Drive", false);
         announce("Your Google session ended. Connect Drive to sign in again.");
+        showDriveDisconnectedDialog();
         return;
       }
       if (fragment.has("error"))

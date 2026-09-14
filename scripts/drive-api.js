@@ -47,8 +47,17 @@ function clearAuth(forget = false) {
   setDriveLoading(false);
 }
 function driveError(error, action = "save") {
+  let wasConnected = drive.ready;
+  try {
+    wasConnected ||= localStorage.getItem(DRIVE_REMEMBERED_KEY) === "1";
+  } catch {
+    /* Storage may be restricted. */
+  }
   saveLabel(error.status === 401 ? "Save to Drive" : "Retry Drive save", false);
-  if (error.status === 401) clearAuth(false);
+  if (error.status === 401) {
+    clearAuth(false);
+    if (wasConnected) showDriveDisconnectedDialog();
+  }
   announce(
     `Drive could not ${action}. Your board is kept on this device. ${error.message}`,
   );
@@ -233,4 +242,3 @@ async function migrateLegacyBoard(item) {
     appProperties: result.appProperties || metadata.appProperties,
   });
 }
-

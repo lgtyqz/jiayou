@@ -95,7 +95,10 @@ await call('Page.reload');await sleep(500);assert.equal(await evaluate('document
 await click('#search');await call('Input.insertText',{text:'no-such-task'});await click('#create');
 assert.equal(await evaluate('document.querySelectorAll(".card").length'),11);
 assert.equal(await evaluate('document.querySelector("#search").value'),'');
-await evaluate('window.testClientId=window.JIAYOU_CONFIG.googleClientId;window.JIAYOU_CONFIG.googleClientId=""');await click('#save');assert.equal(await evaluate('document.querySelector("#setup").open'),true);await evaluate('document.querySelector("#setup").close();window.JIAYOU_CONFIG.googleClientId=window.testClientId');
+await evaluate('window.testClientId=window.JIAYOU_CONFIG.googleClientId;window.JIAYOU_CONFIG.googleClientId=""');await click('#save');assert.equal(await evaluate('document.querySelector("#setup").open'),true);
+assert.equal(await evaluate('document.querySelector("#setup").getAnimations().some(animation=>animation.animationName==="dialog-in")'),true);
+await click('#setup [data-close-dialog]');assert.equal(await evaluate('document.querySelector("#setup").open&&document.querySelector("#setup").classList.contains("closing")'),true);await sleep(100);
+await evaluate('window.JIAYOU_CONFIG.googleClientId=window.testClientId');
 // Exercise Drive's native REST integration without a real account or credentials.
 await evaluate(`window.driveCalls=[];window.realFetch=window.fetch;drive.token='test-token';drive.expires=Date.now()+60000;window.fetch=async(url,options={})=>{driveCalls.push({url,options});return new Response(JSON.stringify(url.includes('spaces=')?{files:[]}:url.includes('uploadType=multipart')?{id:'test-file'}:{}),{status:200,headers:{'Content-Type':'application/json'}})};connectDrive()`);
 assert.equal(await evaluate('document.querySelector("#save").textContent'),'Autosaved');
@@ -111,6 +114,10 @@ await evaluate('window.fetch=async()=>new Response("{}",{status:200});drive.pend
 assert.equal(await evaluate('document.querySelector("#save").textContent'),'Autosaved');
 await evaluate('drive.expires=0;drive.pending=true;flushDrive()');
 assert.equal(await evaluate('document.querySelector("#save").textContent'),'Save to Drive');
+assert.equal(await evaluate('document.querySelector("#drive-disconnected-dialog").open'),true);
+assert.equal(await evaluate('document.querySelector("#drive-disconnected-dialog").getAnimations().some(animation=>animation.animationName==="dialog-in")'),true);
+const disconnectedShot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile('/tmp/jiayou-drive-disconnected.png',Buffer.from(disconnectedShot.data,'base64'));
+await click('#drive-disconnected-dialog [data-close-dialog]');await sleep(100);
 // Exercise multiple named Drive boards with a stateful in-browser REST mock.
 await evaluate(`(()=>{
   clearAuth();
@@ -159,6 +166,7 @@ await evaluate(`(()=>{
   drive.token='test-token';drive.expires=Date.now()+60000;connectDrive();
 })()`);await sleep(100);
 assert.equal(await evaluate('document.querySelector("#conflict-dialog").open'),true);
+assert.equal(await evaluate('document.querySelector("#conflict-dialog").getAnimations().some(animation=>animation.animationName==="dialog-in")'),true);
 await click('#use-drive-board');await sleep(100);
 assert.equal(await evaluate('board.columns[0].cards[0].title'),'Drive Alpha');
 assert.equal(await evaluate('document.querySelectorAll("#board-select option").length'),2);
@@ -171,6 +179,7 @@ await click('#use-local-board');await sleep(100);
 assert.equal(await evaluate('driveStore.get("board-a").board.columns[0].cards[0].title'),'Keep local Alpha');
 // Create validates names and starts with the tutorial board.
 await click('#new-board');
+assert.equal(await evaluate('document.querySelector("#board-name-dialog").getAnimations().some(animation=>animation.animationName==="dialog-in")'),true);
 await evaluate('document.querySelector("#board-name-input").value="Alpha"');
 await click('#board-name-submit');
 assert.equal(await evaluate('document.querySelector("#board-name-error").textContent.includes("already exists")'),true);
@@ -180,7 +189,7 @@ assert.equal(await evaluate('drive.fileName'),'Project');
 assert.equal(await evaluate('board.columns.reduce((sum,column)=>sum+column.cards.length,0)'),9);
 // Rename and duplicate through the management UI.
 await click('#manage-board');
-assert.equal(await evaluate('document.querySelector("#manage-dialog").getAnimations().some(animation=>animation.animationName==="manage-dialog-in")'),true);
+assert.equal(await evaluate('document.querySelector("#manage-dialog").getAnimations().some(animation=>animation.animationName==="dialog-in")'),true);
 await click('#rename-board');
 assert.equal(await evaluate('document.querySelector("#manage-dialog").open&&document.querySelector("#manage-dialog").classList.contains("closing")'),true);
 await sleep(120);await evaluate('document.querySelector("#board-name-input").value="Roadmap"');await click('#board-name-submit');await sleep(100);
@@ -190,7 +199,9 @@ assert.equal(await evaluate('drive.fileName'),'Roadmap copy');
 assert.equal(await evaluate(`(()=>{const source=[...driveStore.values()].find(file=>file.name==='Roadmap.jiayou.json').board;const copy=[...driveStore.values()].find(file=>file.name==='Roadmap copy.jiayou.json').board;return source.columns[0].cards[0].id!==copy.columns[0].cards[0].id})()`),true);
 // Deleting is permanent and chooses the next board alphabetically.
 const duplicateId=await evaluate('drive.fileId');
-await click('#manage-board');await click('#delete-board');await sleep(120);await click('#delete-board-form button[type="submit"]');await sleep(100);
+await click('#manage-board');await click('#delete-board');await sleep(120);
+assert.equal(await evaluate('document.querySelector("#delete-board-dialog").getAnimations().some(animation=>animation.animationName==="dialog-in")'),true);
+await click('#delete-board-form button[type="submit"]');await sleep(100);
 assert.equal(await evaluate(`driveDeleted.includes(${JSON.stringify(duplicateId)})`),true);
 assert.equal(await evaluate('drive.fileName'),'Zenith');
 // A switch flushes edits to the old file before loading the target.
@@ -229,6 +240,7 @@ await click('#manage-board');await click('#disconnect-drive');await sleep(180);
 assert.equal(await evaluate('localStorage.getItem(DRIVE_REMEMBERED_KEY)'),null);
 assert.equal(await evaluate('localStorage.getItem(DRIVE_CONTEXT_KEY)'),null);
 assert.equal(await evaluate('document.querySelector("#board-manager").hidden'),true);
+assert.equal(await evaluate('document.querySelector("#drive-disconnected-dialog").open'),false);
 await evaluate('window.fetch=window.realFetch');
 await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await sleep(300);
 assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
